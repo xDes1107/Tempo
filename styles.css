@@ -1,0 +1,108 @@
+:root {
+  --page-background: #f4f6f8;
+  --card-background: #ffffff;
+  --text-color: #1f2937;
+  --secondary-text-color: #6b7280;
+  --border-color: #d1d5db;
+  --primary-color: #2563eb;
+  --primary-hover-color: #1d4ed8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background-color: var(--page-background);
+  color: var(--text-color);
+  font-family: Arial, sans-serif;
+}
+
+main {
+  width: 100%;
+  max-width: 600px;
+  padding: 40px;
+  background-color: var(--card-background);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(31, 41, 55, 0.12);
+}
+
+h1 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+p {
+  margin-bottom: 32px;
+  color: var(--secondary-text-color);
+  line-height: 1.5;
+}
+
+form {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  font-weight: bold;
+}
+
+input[type="file"] {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+button {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: var(--primary-hover-color);
+}
+
+button:focus-visible,
+input[type="file"]:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+#analysis-results {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+#analysis-results h2 {
+  margin-top: 0;
+}
+
+#analysis-results h3 {
+  margin-top: 24px;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+#analysis-results ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+#analysis-warning {
+  margin-top: 24px;
+  margin-bottom: 0;
+  color: #9a6700;
+  font-size: 14px;
+}

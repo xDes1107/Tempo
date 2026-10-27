@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="script.js" defer></script>
+  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Translator</title>
+</head>
+<body>
+  <main>
+    <h1>Visual Translator</h1>
+
+    <p>
+      Upload a technical PDF to begin analysis.
+    </p>
+
+    <form>
+      <label for="pdf-file">Choose a PDF file</label>
+
+      <input
+        id="pdf-file"
+        name="pdf-file"
+        type="file"
+        accept="application/pdf"
+      >
+
+      <p id="file-status" aria-live="polite">
+        No file selected.
+     </p>
+
+      <button type="submit">Upload PDF</button>
+    </form>
+    <section id="analysis-results" hidden>
+  <h2>Candidate results</h2>
+
+  <p id="analysis-summary"></p>
+
+  <h3>Product name</h3>
+  <p id="product-name"></p>
+
+  <h3>Standards</h3>
+  <ul id="standards-list"></ul>
+
+  <h3>Measurements</h3>
+  <ul id="measurements-list"></ul>
+
+  <p id="analysis-warning"></p>
+  </section>
+  </main>
+</body>
+</html>

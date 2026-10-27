@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1.0",
+  "exportedAt": "2026-10-24T20:38:09.558Z",
+  "document": {
+    "originalFileName": "test.pdf",
+    "sizeInBytes": 1694158
+  },
+  "extraction": {
+    "status": "text-extracted",
+    "hasExtractableText": true,
+    "textCharacterCount": 2445,
+    "text": "Cut protection\nKRYTECH 563\nLow risk - ISO B\nCUT PROTECTION\nLEVEL B\nEN 388\n4X43B\nISO 13997\n5.9 N (601 g)\nDexterity EN ISO\n21420: 5/5\nCATEGORY 2\nStandard protection for intricate handling in dry and dirty\nenvironments\nSPECIFIC ADVANTAGES\nINDUSTRIES \tAPPLICATIONS\nDurability\nExcellent life of duration thanks to an abrasion resistant coating\t•Excellent resistance to greases\t•\nSkin protection\nFree of harmful substances: DMF Free\t•\nGuaranteed quality\nSilicone free to prevent traces, defects on metal sheet and glass prior to\npainting\n•\nAutomotive industry\t•Construction industry:\nMetalworkers/Locksmiths\n•\nPaper industry\t•Local Authorities: Local\nAuthorities (Waste Collection\nand Processing)\n•\nMechanical maintenance\t•Press work\t•Handling sheet metal\t•Handling cardboard and paper\t•Waste collection\t•\nMAPA SAS capital de 35.000.010 €\n420, rue d’Estienne d’Orves\n92705 Colombes Cedex France\nRCS Nanterre 314 307 720\nmapa-pro.com\nEdit 15/10/2026\n\n-- 1 of 2 --\n\nCut protection\nKRYTECH 563\nLow risk - ISO B\nLEGENDS\nEN388\n4 X 4 3 B\n0-4 0-5 0-4 0-4 A-F P\nMECHANICAL HAZARDS\nPERFORMANCE LEVELS (X = NOT\nTESTED)\nAbrasion resistance\nBlade cut resistance\nTear resistance\nPuncture resistance\nCut resistance according to ISO\n13997\nImpact protection (optional)\nPRODUCT DETAILS\nInterior finish \tSeamless textile support from HDPE fibres\nGauge \t13\nExterior finish \tVentilated back\nMaterial \tNitrile\nCuff characteristic \tKnitted Cuff\nColour \tBlack, Grey\nLength (cm) \t23-27\nSizes \t7 8 9 10 11\nSurface resistance according\nto EN1149-1 (Value in palm\narea at 25% relative humidity)\n3.9E+10 Ω\nVertical resistance according\nto EN1149-2 (Value in palm\narea at 25% relative humidity)\n7.0E+10 Ω\nLOGISTIC DETAILS\nPackaging \t1 pair/bag\n12 pairs/box\nLEGISLATION\nThis product is not classified hazardous according to the regulation (EC)\nn°1272/2008 of the European Parliament and of the Council.\n•\nThis product does not contain more than 0.1 % of substance of very high\nconcern (SVHC) or any substance included in the annex XVII of the regulation n°\n1907/2006 of the European Parliament and of the Council (REACH).\n•\nUE type certificate or CE type examination certificate:\n0075/014/162/08/18/1658 Update 01-20/02/2024\n•\nIssued by the notified body nr: 0075 CTC - 4, rue Hermann Frenkel - 69367 Lyon\nCedex 07- FRANCE\n•\nMAPA SAS capital de 35.000.010 €\n420, rue d’Estienne d’Orves\n92705 Colombes Cedex France\nRCS Nanterre 314 307 720\nmapa-pro.com\nEdit 15/10/2026\n\n-- 2 of 2 --"
+  },
+  "candidateData": {
+    "extractionMethod": "deterministic-rules-v1",
+    "product": {
+      "name": {
+        "value": "KRYTECH 563",
+        "evidence": [
+          {
+            "line": 2,
+            "quote": "KRYTECH 563"
+          }
+        ]
+      }
+    },
+    "standards": [
+      {
+        "value": "EN 388",
+        "evidence": [
+          {
+            "line": 6,
+            "quote": "EN 388"
+          }
+        ]
+      },
+      {
+        "value": "ISO 13997",
+        "evidence": [
+          {
+            "line": 8,
+            "quote": "ISO 13997"
+          }
+        ]
+      },
+      {
+        "value": "EN ISO\n21420",
+        "evidence": []
+      },
+      {
+        "value": "ISO\n13997",
+        "evidence": []
+      }
+    ],
+    "unclassifiedMeasurements": [
+      {
+        "value": 5.9,
+        "originalValue": "5.9 N",
+        "unit": "N",
+        "evidence": [
+          {
+            "line": 9,
+            "quote": "5.9 N (601 g)"
+          }
+        ]
+      },
+      {
+        "value": 601,
+        "originalValue": "601 g",
+        "unit": "g",
+        "evidence": [
+          {
+            "line": 9,
+            "quote": "5.9 N (601 g)"
+          }
+        ]
+      }
+    ],
+    "warnings": [
+      "All extracted values are candidates and require human review."
+    ]
+  }
+}
