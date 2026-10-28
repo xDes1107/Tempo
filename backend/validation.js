@@ -1,7 +1,9 @@
 "use strict";
-// Deterministic data-quality checks over the locked 10-field schema.
+// Deterministic data-quality checks over the 11-field schema (v2.1).
 // AI may flag ambiguity later, but these rules always run in code
 // (Architecture 3.6). Each finding: code, severity, message, field, evidence.
+// Backward compat: v2.0 10-field records pass; missing OPTIONAL field is
+// info only, missing REQUIRED field is still an error.
 
 const { FIELD_KEYS, fieldDef } = require("./schema");
 
@@ -19,7 +21,12 @@ function validateRecord(record) {
 
   FIELD_KEYS.forEach(function (key) {
     if (!(key in record.fields)) {
-      findings.push(finding("UNKNOWN_SCHEMA", "error", "Record is missing locked field: " + key + ".", key));
+      const def = fieldDef(key);
+      if (def && def.required) {
+        findings.push(finding("UNKNOWN_SCHEMA", "error", "Record is missing locked field: " + key + ".", key));
+      } else {
+        findings.push(finding("MISSING_OPTIONAL_FIELD", "info", "Record has no optional field: " + key + " (v2.0 record?).", key));
+      }
     }
   });
 

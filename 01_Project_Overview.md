@@ -1,59 +1,39 @@
-Current Idea:
+# Visual Translator - Project Overview (updated Oct 28)
 
-A Visual Translator Tool, that leverages AI to analyse PDF files for data extraction, analysis and quality checks, with a future translation feature.
+A tool that turns supplier product datasheets (PDF) into company-ready
+product data, watermarked documents, and translated outputs.
 
-In plain terms:
+## The three goals
 
-01
+### Goal 1 - Data extraction and enrichment (partially built)
+Extract structured data from product sheets: product identity, norms and
+standards, materials, dimensions, sizes, performance levels, industries
+and applications. Outputs feed website descriptions and ERP imports
+(JSON/CSV file downloads; no live ERP integration in demo scope).
+Status: deterministic regex extractor + locked schema + validation live;
+AI enrichment (Meta Model API) and the industries field are next.
 
-Frontend
+### Goal 2 - Image manipulation (new: company watermark)
+Stamp processed documents with the company watermark (logo).
+Prerequisites: operator provides the logo asset (PNG, transparent);
+engine choice (MuPDF overlay vs pdf-lib) decided at implementation.
+Not started.
 
-User uploads a technical PDF
+### Goal 3 - Translation and reproduction (planned Oct 30+)
+Translate validated content, then reproduce either:
+(a) as faithful to the original layout as possible, or
+(b) in the standardized company format/template.
+Recommendation: build (b) first (template render from the locked schema),
+attempt (a) as a stretch - faithful layout rebuild is the hardest part.
 
-02
+## Pipeline (unchanged skeleton, extended outputs)
 
-Backend API
-
-Validates the upload and creates an analysis job
-
-03
-
-PDF Processing
-
-MuPDF renders pages and extracts available text and layout
-
-04
-
-AI Analysis
-
-Interprets product information, tables, diagrams and context
-
-05
-
-Extraction & Normalization
-
-Maps findings into a defined JSON schema
-
-06
-
-Data Quality Validation
-
-Checks required fields, units, consistency and evidence
-
-07
-
-Storage
-
-SQLite stores records, findings and processing status
-
-08
-
-Results & Reporting
-
-Frontend presents findings and generates a downloadable PDF report
-
-
-Future extension: Translation
-
-Translate extracted content or reports while preserving source values and evidence.
-
+01 Frontend - upload PDF, review results, correct values, pick language
+02 Backend API - validates upload, creates a tracked analysis job
+03 PDF Processing - text + layout (+ page render for watermark/report)
+04 AI Analysis - Meta Model API interprets content (extract + translate)
+05 Extraction & Normalization - maps facts into the locked JSON schema
+06 Data Quality Validation - deterministic checks, severity + evidence
+07 Storage - SQLite jobs DB (+ JSON export for ERP/website use)
+08 Results & Outputs - side-by-side translation view, watermarked PDF,
+   bilingual report, standardized company-format document

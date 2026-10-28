@@ -1,12 +1,14 @@
 "use strict";
-// Visual Translator - locked 10-field product schema.
-// Version: 2.0.0-locked-2026-10-27 (Roadmap v2, Oct 27 rescope day).
+// Visual Translator - 11-field product schema.
+// Version: 2.1.0-2026-10-28 (Goal 1 enrichment: adds optional
+// industriesOrApplications caught on DURACOIL eval Oct 28).
 // Every extracted field keeps: value (normalized, source language),
 // originalValue (verbatim), unit (never translated), evidence (source
 // quotes pointing at the PDF), translatable flag, and a translation
-// slot filled later by the Meta Model API step (Oct 30).
+// slot filled later by the Meta Model API step (Goal 3).
 
-const SCHEMA_VERSION = "2.0.0-locked-2026-10-27";
+const SCHEMA_VERSION = "2.1.0-2026-10-28";
+const SUPPORTED_SCHEMA_VERSIONS = ["2.0.0-locked-2026-10-27", SCHEMA_VERSION];
 
 const FIELDS = [
   { key: "productName", label: "Product name", required: true, translatable: true, allowsUnit: false },
@@ -18,7 +20,8 @@ const FIELDS = [
   { key: "sizesAvailable", label: "Sizes available", required: false, translatable: false, allowsUnit: false },
   { key: "standardsAndCertifications", label: "Standards / certifications", required: false, translatable: false, allowsUnit: false },
   { key: "protectionLevelsOrPerformance", label: "Protection levels / performance", required: false, translatable: false, allowsUnit: true },
-  { key: "usageRestrictionsOrWarnings", label: "Usage restrictions / warnings", required: false, translatable: true, allowsUnit: false }
+  { key: "usageRestrictionsOrWarnings", label: "Usage restrictions / warnings", required: false, translatable: true, allowsUnit: false },
+  { key: "industriesOrApplications", label: "Industries / applications", required: false, translatable: true, allowsUnit: false }
 ];
 
 const FIELD_KEYS = FIELDS.map(function (f) { return f.key; });
@@ -59,7 +62,7 @@ function createEmptyRecord(documentName, extractionEngine) {
   return {
     schemaVersion: SCHEMA_VERSION,
     documentName: documentName || null,
-    extractionEngine: extractionEngine || "deterministic-rules-v2-schema-locked",
+    extractionEngine: extractionEngine || "deterministic-rules-v2.1",
     fields: fields
   };
 }
@@ -70,8 +73,23 @@ function makeEvidence(page, quote, charRange) {
   return ev;
 }
 
+// Backward compat: Oct 27 10-field records validate and migrate cleanly.
+// Missing optional fields are filled with empty slots, version is bumped.
+function migrateRecord(record) {
+  if (!record || !record.fields) return record;
+  FIELD_KEYS.forEach(function (key) {
+    if (!(key in record.fields)) record.fields[key] = makeEmptyField(key);
+  });
+  if (SUPPORTED_SCHEMA_VERSIONS.indexOf(record.schemaVersion) !== -1 && record.schemaVersion !== SCHEMA_VERSION) {
+    record.migratedFrom = record.schemaVersion;
+    record.schemaVersion = SCHEMA_VERSION;
+  }
+  return record;
+}
+
 module.exports = {
   SCHEMA_VERSION: SCHEMA_VERSION,
+  SUPPORTED_SCHEMA_VERSIONS: SUPPORTED_SCHEMA_VERSIONS,
   FIELDS: FIELDS,
   FIELD_KEYS: FIELD_KEYS,
   DO_NOT_TRANSLATE: DO_NOT_TRANSLATE,
@@ -79,5 +97,6 @@ module.exports = {
   isTranslatableField: isTranslatableField,
   makeEmptyField: makeEmptyField,
   createEmptyRecord: createEmptyRecord,
-  makeEvidence: makeEvidence
+  makeEvidence: makeEvidence,
+  migrateRecord: migrateRecord
 };

@@ -1,23 +1,41 @@
 "use strict";
-// Visual Translator backend - skeleton wired to the locked 10-field schema
-// and the SQLite job store (Roadmap v2, Oct 27).
-// POST /api/documents keeps its legacy response fields (candidateData)
-// so the current vanilla frontend keeps working; new clients use
-// jobId + record + findings and GET /api/jobs[/:id].
-// Page-count cap (20) and MuPDF rendering land Oct 28; pageCount is
-// stored as null until then.
+// Visual Translator backend - 11-field schema v2.1 + SQLite job store.
+// Serves the frontend static (index.html is the entry point) and the API.
+// POST /api/documents keeps legacy candidateData so the vanilla frontend
+// keeps working; new clients use jobId + record + findings + enriched.
+// Goal 1: GET /api/jobs/:id/export?format=json|csv (ERP/website download).
+// Goal 2: POST+GET /api/jobs/:id/watermark (corner logo stamp).
+// Uploads persist under data/uploads; watermarked PDFs under data/watermarked.
 
 const http = require("node:http");
 const crypto = require("node:crypto");
+const nodeFs = require("node:fs/promises");
+const nodePath = require("node:path");
 const { extractPdfText } = require("./pdf-extractor");
 const { saveAnalysisResult } = require("./results");
 const { extractProductData } = require("./extractor");
 const { validateRecord } = require("./validation");
+const { buildEnrichment } = require("./enrich");
+const { migrateRecord } = require("./schema");
+const { stampPdf, POSITIONS, DEFAULTS } = require("./watermark");
+const { translateRecord, TARGET_LANGS, recordWithTranslations } = require("./translate");
+const { buildBilingualReport } = require("./report");
+const { chatJson } = require("./meta-api");
 const { SqliteJobStore } = require("./job-store-sqlite");
 
 const host = "localhost";
 const port = 7500;
 const maximumFileSize = 10 * 1024 * 1024;
+const uploadsDir = nodePath.resolve(__dirname, "..", "data", "uploads");
+const watermarkedDir = nodePath.resolve(__dirname, "..", "data", "watermarked");
+const defaultLogoFile = DEFAULTS.logoFile;
+
+const STATIC_FILES = {
+  "/": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/index.html": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/script.js": { file: "script.js", type: "text/javascript; charset=utf-8" },
+  "/styles.css": { file: "styles.css", type: "text/css; charset=utf-8" }
+};
 
 const store = new SqliteJobStore();
 
@@ -27,6 +45,25 @@ function sendJson(response, statusCode, data) {
     "Access-Control-Allow-Origin": "*"
   });
   response.end(JSON.stringify(data));
+}
+
+function parseUrl(request) {
+  try {
+    return new URL(request.url, "http://" + (request.headers.host || "localhost"));
+  } catch (e) {
+    return { pathname: request.url.split("?")[0], searchParams: new URLSearchParams() };
+  }
+}
+
+function withEnrichment(job) {
+  if (!job) return job;
+  if (job.record) migrateRecord(job.record);
+  if (job.record && !job.enriched) {
+    try {
+      job.enriched = buildEnrichment(job.record, job.findings || []);
+    } catch (e) { job.enriched = null; }
+  }
+  return job;
 }
 
 function readRequestBody(request) {
@@ -80,19 +117,185 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
-  if (request.method === "GET" && request.url === "/health") {
+  const parsed = parseUrl(request);
+  const pathname = parsed.pathname;
+
+  if (request.method === "GET" && STATIC_FILES[pathname]) {
+    try {
+      const body = await nodeFs.readFile(nodePath.resolve(__dirname, "..", STATIC_FILES[pathname].file));
+      response.writeHead(200, { "Content-Type": STATIC_FILES[pathname].type });
+      response.end(body);
+    } catch (e) {
+      sendJson(response, 404, { error: "Frontend file not found." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/health") {
     sendJson(response, 200, { status: "ok", message: "Visual Translator backend is running." });
     return;
   }
 
-  if (request.method === "GET" && request.url === "/api/jobs") {
+  if (request.method === "GET" && pathname === "/api/jobs") {
     sendJson(response, 200, store.all());
     return;
   }
 
-  if (request.method === "GET" && request.url.startsWith("/api/jobs/")) {
-    const id = request.url.split("/").pop();
+  // Goal 1 export: /api/jobs/:id/export?format=json|csv
+  if (request.method === "GET" && pathname.indexOf("/api/jobs/") === 0 && pathname.endsWith("/export")) {
+    const parts = pathname.split("/").filter(Boolean);
+    const id = parts[2];
+    const job = withEnrichment(store.get(id));
+    if (!job) {
+      sendJson(response, 404, { error: "Job not found." });
+      return;
+    }
+    const format = (parsed.searchParams.get("format") || "json").toLowerCase();
+    if (format === "csv") {
+      const lang = (parsed.searchParams.get("lang") || "").toLowerCase();
+      let csv = (job.enriched && job.enriched.erpCsv) || "";
+      if (lang && job.record) {
+        csv = buildEnrichment(recordWithTranslations(job.record, lang), job.findings || []).erpCsv;
+      }
+      response.writeHead(200, {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=\"" + job.id + ".csv\"",
+        "Access-Control-Allow-Origin": "*"
+      });
+      response.end(csv);
+      return;
+    }
+    sendJson(response, 200, { jobId: job.id, record: job.record, findings: job.findings, enriched: job.enriched });
+    return;
+  }
+
+  // Goal 3 output file: bilingual PDF report for a translated job.
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/report$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = withEnrichment(store.get(id));
+    if (!job || !job.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    const lang = (parsed.searchParams.get("lang") || "pt").toLowerCase();
+    const hasLang = Object.keys(job.record.fields || {}).some(function (key) {
+      const f = job.record.fields[key];
+      return f && f.value && f.translation && f.translation.lang === lang;
+    });
+    if (!hasLang) {
+      sendJson(response, 400, { error: "No " + lang + " translation yet. POST to /api/jobs/" + id + "/translate first." });
+      return;
+    }
+    try {
+      const bytes = await buildBilingualReport(job.record, job.findings || [], lang);
+      response.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=\"" + id + "-report-" + lang + ".pdf\"",
+        "Access-Control-Allow-Origin": "*"
+      });
+      response.end(bytes);
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // Goal 2: stamp the stored source PDF with the logo.
+  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/watermark$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
     const job = store.get(id);
+    if (!job) {
+      sendJson(response, 404, { error: "Job not found." });
+      return;
+    }
+    let body = {};
+    try {
+      body = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
+    } catch (e) {
+      sendJson(response, 400, { error: "Invalid JSON body." });
+      return;
+    }
+    const position = body.position || "upper-right";
+    if (POSITIONS.indexOf(position) === -1) {
+      sendJson(response, 400, { error: "Unknown position. Use one of: " + POSITIONS.join(", ") });
+      return;
+    }
+    const opacity = body.opacity == null ? 0.15 : Number(body.opacity);
+    if (!job.filePath) {
+      sendJson(response, 404, { error: "Source PDF was not stored for this job (uploaded before persistence). Re-upload to enable watermarking." });
+      return;
+    }
+    try {
+      const pdfBytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", job.filePath));
+      const pngBytes = await nodeFs.readFile(body.logoFile || defaultLogoFile);
+      const out = await stampPdf(pdfBytes, pngBytes, { position: position, opacity: opacity });
+      const wmRel = nodePath.join("data", "watermarked", id + "-" + position + ".pdf");
+      await nodeFs.mkdir(watermarkedDir, { recursive: true });
+      await nodeFs.writeFile(nodePath.resolve(__dirname, "..", wmRel), out);
+      const updated = withEnrichment(store.update(id, { watermarkFile: wmRel, watermarkOptions: { position: position, opacity: opacity } }));
+      sendJson(response, 200, { jobId: id, watermarkFile: wmRel, position: position, opacity: opacity, downloadUrl: "/api/jobs/" + id + "/watermark", job: updated });
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // Goal 3: translate the validated record via the Meta Model API.
+  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/translate$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = withEnrichment(store.get(id));
+    if (!job || !job.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    let body = {};
+    try {
+      body = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
+    } catch (e) {
+      sendJson(response, 400, { error: "Invalid JSON body." });
+      return;
+    }
+    if (!body.targetLang) {
+      sendJson(response, 400, { error: "Provide targetLang: " + TARGET_LANGS.join(", ") });
+      return;
+    }
+    try {
+      const out = await translateRecord(job.record, body.targetLang, chatJson, job.enriched && job.enriched.websiteDescription);
+      if (out.translatedDescription) {
+        job.record.translatedDescriptions = Object.assign({}, job.record.translatedDescriptions, { [body.targetLang]: out.translatedDescription });
+      }
+      const updated = withEnrichment(store.update(id, { record: job.record }));
+      sendJson(response, 200, { jobId: id, targetLang: body.targetLang, applied: out.applied, translatedDescription: out.translatedDescription, model: out.model, note: out.note || null, record: updated.record });
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/watermark$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = store.get(id);
+    if (!job || !job.watermarkFile) {
+      sendJson(response, 404, { error: "No watermark yet. POST to /api/jobs/" + (id || ":id") + "/watermark first." });
+      return;
+    }
+    try {
+      const bytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", job.watermarkFile));
+      response.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=\"" + id + "-watermarked.pdf\"",
+        "Access-Control-Allow-Origin": "*"
+      });
+      response.end(bytes);
+    } catch (e) {
+      sendJson(response, 404, { error: "Watermark file missing on disk." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname.indexOf("/api/jobs/") === 0) {
+    const id = pathname.split("/").filter(Boolean).pop();
+    const job = withEnrichment(store.get(id));
     if (!job) {
       sendJson(response, 404, { error: "Job not found." });
       return;
@@ -101,7 +304,7 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
-  if (request.method === "POST" && request.url === "/api/documents") {
+  if (request.method === "POST" && pathname === "/api/documents") {
     const fileName = request.headers["x-file-name"];
     if (!fileName || !fileName.toLowerCase().endsWith(".pdf")) {
       sendJson(response, 400, { error: "Please provide a PDF filename." });
@@ -114,25 +317,30 @@ const server = http.createServer(async function (request, response) {
         sendJson(response, 400, { error: "The uploaded file is not a valid PDF." });
         return;
       }
-      store.create({ id: jobId, fileName: fileName, createdAt: new Date().toISOString(), status: "processing" });
+      await nodeFs.mkdir(uploadsDir, { recursive: true });
+      const storedRel = nodePath.join("data", "uploads", jobId + ".pdf");
+      await nodeFs.writeFile(nodePath.resolve(__dirname, "..", storedRel), fileBuffer);
+      store.create({ id: jobId, fileName: fileName, createdAt: new Date().toISOString(), status: "processing", filePath: storedRel });
       const extractedText = await extractPdfText(fileBuffer);
       const record = extractProductData(extractedText, fileName);
       const findings = validateRecord(record);
-      const saved = await saveAnalysisResult(fileName, fileBuffer.length, extractedText, record, findings);
-      const job = store.update(jobId, {
+      const enriched = buildEnrichment(record, findings);
+      const saved = await saveAnalysisResult(fileName, fileBuffer.length, extractedText, record, findings, enriched);
+      const job = withEnrichment(store.update(jobId, {
         status: "completed",
         completedAt: new Date().toISOString(),
         pageCount: null,
         record: record,
         findings: findings,
         resultFile: saved.outputFileName
-      });
+      }));
       sendJson(response, 201, {
         message: "PDF text extracted successfully.",
         jobId: job.id,
         resultFile: saved.outputFileName,
         record: record,
         findings: findings,
+        enriched: enriched,
         candidateData: toLegacyCandidateData(record),
         document: {
           fileName: fileName,

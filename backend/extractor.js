@@ -1,8 +1,8 @@
 "use strict";
-// Deterministic extraction mapped onto the locked 10-field schema.
-// Method: deterministic-rules-v2-schema-locked. Regex candidates only -
+// Deterministic extraction mapped onto the 11-field schema (v2.1).
+// Method: deterministic-rules-v2.1. Regex candidates only -
 // every value needs human review. AI (Meta Model API) replaces the
-// finders on Oct 29 but keeps this output shape and evidence contract.
+// finders next but keeps this output shape and evidence contract.
 
 const { createEmptyRecord, makeEvidence } = require("./schema");
 
@@ -96,10 +96,59 @@ function findWarnings(text) {
   return m ? m[0].trim() : null;
 }
 
+function cleanIndustryValue(v) {
+  if (!v) return null;
+  let s = String(v).split(bullet).join("; ").replace(/[\t]+/g, "; ").replace(/\s{2,}/g, " ");
+  let parts = s.split(";").map(function (x) { return x.replace(/^[;:,\.\s-]+|[;:,\.\s-]+$/g, "").trim(); }).filter(function (x) { return x && x.length >= 4 && !/^(applications?|industr(y|ies)|trades?)$/i.test(x); });
+  if (!parts.length) return null;
+  s = parts.join("; ");
+  if (/^(industries\s+applications)$/i.test(s)) return null;
+  return s.slice(0, 300);
+}
+
+const bullet = String.fromCharCode(8226);
+
+function grabSectionBlock(text, headerRe) {
+  const m = text.match(headerRe);
+  if (!m) return null;
+  const after = text.slice(m.index + m[0].length, m.index + m[0].length + 500);
+  const lines = after.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+  const stopRe = /^(FEATURES|BENEFITS|NORMS|PACKAGING|SPECIFIC|COMFORT|CATEGORY|PROTECTION|PERFORMANCE|DETAILS|DESCRIPTION)\b/i;
+  const picked = [];
+  for (const ln of lines) {
+    if (stopRe.test(ln)) break;
+    if (/^(EN|ISO|ANSI|Cat\b|CE\b)/i.test(ln) && picked.length) break;
+    if (/^\d{1,2} of \d{1,2} /.test(ln)) break;
+    const bulletParts = ln.split(bullet).map(function (p) { return cleanIndustryValue(p); }).filter(Boolean);
+    if (bulletParts.length > 1) {
+      bulletParts.forEach(function (p) { if (picked.indexOf(p) === -1) picked.push(p); });
+    } else {
+      const c = cleanIndustryValue(ln);
+      if (c && picked.indexOf(c) === -1) picked.push(c);
+    }
+    if (picked.join("; ").length > 250 || picked.length >= 4) break;
+  }
+  return picked.length ? picked.join("; ") : null;
+}
+
+function findIndustriesOrApplications(text) {
+  let v = grabSectionBlock(text, /INDUSTRIES\s*:?\s*\r?\n/i);
+  if (v) return v;
+  v = grabSectionBlock(text, /TRADES\s*&\s*APPLICATIONS\s*:?\s*\r?\n/i);
+  if (v) return v;
+  const labeled = text.match(/(?:Suitable for|Recommended for|Ideal for|Intended for|Field(?:s)? of use)\s*:?\s*([^\n\r]{4,160})/i);
+  if (labeled) {
+    const c = cleanIndustryValue(labeled[1]);
+    if (c) return c;
+  }
+  const m = text.match(/(Automotive[^\n\r]{0,80}|Aerospace[^\n\r]{0,60}|Food (?:industry|handling|preparation)[^\n\r]{0,80}|Construction[^\n\r]{0,60}|Oil\s*(?:&|and)?\s*gas[^\n\r]{0,60}|Electronics[^\n\r]{0,60}|Medical[^\n\r]{0,60}|Chemical[^\n\r]{0,60}|Maintenance[^\n\r]{0,60}|Assembly[^\n\r]{0,60})/i);
+  return m ? cleanIndustryValue(m[0]) : null;
+}
+
 function extractProductData(text, documentName) {
   const safeText = text || "";
   const lines = getLines(safeText);
-  const record = createEmptyRecord(documentName || null);
+  const record = createEmptyRecord(documentName || null, "deterministic-rules-v2.1");
 
   setField(record, lines, safeText, "productName", findProductName(lines));
   setField(record, lines, safeText, "manufacturer", findManufacturer(safeText));
@@ -113,8 +162,9 @@ function extractProductData(text, documentName) {
   setField(record, lines, safeText, "standardsAndCertifications", findStandards(safeText));
   setField(record, lines, safeText, "protectionLevelsOrPerformance", findProtectionLevels(safeText));
   setField(record, lines, safeText, "usageRestrictionsOrWarnings", findWarnings(safeText));
+  setField(record, lines, safeText, "industriesOrApplications", findIndustriesOrApplications(safeText));
 
   return record;
 }
 
-module.exports = { extractProductData: extractProductData };
+module.exports = { extractProductData: extractProductData, findIndustriesOrApplications: findIndustriesOrApplications };

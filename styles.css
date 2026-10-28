@@ -106,3 +106,100 @@ input[type="file"]:focus-visible {
   color: #9a6700;
   font-size: 14px;
 }
+#watermark {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.corner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.corner-grid label {
+  font-weight: normal;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#watermark-apply {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--primary-color);
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#watermark-apply:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+#watermark-download {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+#watermark-status {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.corner-grid .footer-row {
+  grid-column: 1 / -1;
+}
+
+#translation {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.lang-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lang-row button {
+  padding: 10px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--card-background);
+  color: var(--text-color);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.lang-row button:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+#translation-status {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+#translation-description {
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+#translation-list {
+  padding-left: 20px;
+  color: var(--secondary-text-color);
+  line-height: 1.6;
+}

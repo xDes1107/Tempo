@@ -47,6 +47,44 @@
 
   <p id="analysis-warning"></p>
   </section>
+    <section id="watermark" hidden>
+  <h2>Watermark</h2>
+
+  <p>Choose a corner for the company logo, then apply it to the uploaded PDF.</p>
+
+  <div class="corner-grid" role="radiogroup" aria-label="Watermark position">
+    <label><input type="radio" name="wm-position" value="upper-left"> Upper left</label>
+    <label><input type="radio" name="wm-position" value="upper-right" checked> Upper right</label>
+    <label><input type="radio" name="wm-position" value="lower-left"> Lower left</label>
+    <label><input type="radio" name="wm-position" value="lower-right"> Lower right</label>
+    <label class="footer-row"><input type="radio" name="wm-position" value="footer"> Footer (full-width band)</label>
+  </div>
+
+  <button id="watermark-apply" type="button">Apply watermark</button>
+
+  <p id="watermark-status" aria-live="polite"></p>
+
+  <a id="watermark-download" hidden>Download watermarked PDF</a>
+  </section>
+    <section id="translation" hidden>
+  <h2>Translation</h2>
+
+  <p>Translate the extracted values. IDs, numbers, units and certification codes are never translated.</p>
+
+  <div class="lang-row" role="group" aria-label="Target language">
+    <button type="button" data-lang="pt">Português</button>
+    <button type="button" data-lang="es">Español</button>
+    <button type="button" data-lang="en">English</button>
+  </div>
+
+  <p id="translation-status" aria-live="polite"></p>
+
+  <div id="translation-result" hidden>
+    <p id="translation-description"></p>
+    <ul id="translation-list"></ul>
+    <p class="dl-row"><a id="report-download" hidden>Download bilingual PDF report</a><a id="csv-download" hidden>Download translated CSV</a></p>
+  </div>
+  </section>
   </main>
 </body>
 </html>

@@ -4,13 +4,16 @@
   "main": "script.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "verify:meta": "node backend/verify-meta.js",
+    "list-models": "node backend/list-models.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5"
   }
 }

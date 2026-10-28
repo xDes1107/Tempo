@@ -1,7 +1,8 @@
 "use strict";
 // JSON export kept as interchange format; SQLite is the source of truth.
-// Accepts the locked 10-field record + findings. Old callers passing the
-// v1 productData object still work: it is stored under legacyProductData.
+// Accepts the 11-field record + findings + enrichment (Goal 1).
+// Old callers passing the v1 productData object still work: it is stored
+// under legacyProductData. enriched is optional for backward compat.
 
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -17,7 +18,7 @@ function isLockedRecord(obj) {
   return Boolean(obj && obj.fields && typeof obj.fields === "object");
 }
 
-async function saveAnalysisResult(fileName, fileSize, extractedText, recordOrLegacy, findings) {
+async function saveAnalysisResult(fileName, fileSize, extractedText, recordOrLegacy, findings, enriched) {
   const resultsFolder = path.resolve(__dirname, "..", "data", "results");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outputFileName = createSafeFileName(fileName) + "-" + timestamp + ".json";
@@ -35,6 +36,8 @@ async function saveAnalysisResult(fileName, fileSize, extractedText, recordOrLeg
     },
     record: locked ? recordOrLegacy : null,
     findings: Array.isArray(findings) ? findings : [],
+    enriched: enriched || null,
+    erp: enriched && enriched.erpRow ? { row: enriched.erpRow, csv: enriched.erpCsv } : null,
     legacyProductData: locked ? null : recordOrLegacy || null
   };
 

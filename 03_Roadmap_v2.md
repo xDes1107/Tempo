@@ -70,3 +70,134 @@ Add for translation:
 ### Then - Nov 1/2/3 (Report, Deploy, Submit)
 - Bilingual PDF report (specs + findings + evidence refs); source PDF stays separate.
 - One Dockerfile (backend serves frontend static, SQLite file volume); deploy Render/Fly.io/HuggingFace; README + demo video; submit early Nov 3.
+## Progress Log (updated Oct 28, morning - operator update)
+
+### Done by operator
+- First commit made (repo initialized in `Production/`).
+- 5 real datasheets added to `sample-pdfs/`: activarmr glove (PT), DURACOIL steel sheet, P01H (2.4MB), JEAN STRETCH textile (FR/EN), SOLO BLUE glove. Synthetic fixture kept.
+- `MODEL_API_KEY` configured as a local environment variable (present, non-empty; never stored in repo).
+
+### Datasheet eval (all 6 PDFs parse; deterministic extractor only)
+- activarmr: product/manufacturer/model/protection found, 0 findings.
+- DURACOIL: 8/10 fields found incl. materials, sizes, standards, warnings; industry mentions present in text (Automotive repairs and maintenance) but NOT captured - no schema field for it.
+- P01H + JEAN: manufacturer missing (needs AI step); standards evidence incomplete.
+- SOLO BLUE: 8/10 fields, same standards-evidence gap.
+- Conclusion: regex covers identity well; dimensions/category/industries need the AI step.
+
+### Model integration scaffold (ready for operator to verify)
+- New `backend/meta-api.js`: reads `MODEL_API_KEY` (+ optional `MODEL_API_BASE`, defaults to `https://api.llama.com/v1`; model override via `MODEL_API_MODEL`). `verifyConnection()` = cheap GET /models, spends no tokens. `chatJson()` ready for Oct 29/30 extract + translate prompts.
+- New `npm run verify:meta` + `backend/verify-meta.js`. Sandbox run fails at network (`fetch failed`, key WAS picked up) - operator: run it in your own shell where the key + network exist. If your endpoint is not api.llama.com, set `MODEL_API_BASE`.
+OPERATOR: SUCCESS. MESSAGE: $env:MODEL_API_BASE = "https://api.meta.ai/v1"
+PS C:PATH/TO/FILE> npm run verify:meta
+
+> production@1.0.0 verify:meta
+> node backend/verify-meta.js
+
+Model API reachable at https://api.meta.ai/v1 (9 models visible).
+
+### Goals redefined (see `01_Project_Overview.md`)
+- Goal 1 extraction/enrichment (website descriptions + ERP file imports), Goal 2 company watermark, Goal 3 faithful-vs-standardized translated reproduction (standardized first, faithful = stretch).
+- Scope impact: file-based ERP/website export is BACK in scope (live ERP integration stays out); watermark needs logo PNG from operator + engine decision; reproduction mode (a/b) decided at report step.
+- Proposed schema amendment (pending operator confirm): add optional translatable `industriesOrApplications` field -> schema v2.1. Say go and it gets implemented with the AI step.
+
+## Progress Log (updated Oct 28 - Goal 1 enrichment built, Goal 2 scoped)
+
+### Goal 1 done (deterministic part)
+- Schema v2.1.0-2026-10-28: adds optional translatable industriesOrApplications (11 fields). Old v2.0 records migrate and validate cleanly.
+- Extractor deterministic-rules-v2.1: INDUSTRIES / TRADES block grabber plus labeled and keyword fallbacks. DURACOIL now yields Aerospace Airports and Ports; Automotive Mechanical.
+- New backend/enrich.js: website description template, flat ERP row (38 cols), ERP CSV serializer, AI-extract prompt builder for the Meta API step.
+- Server: POST /api/documents returns enriched; GET /api/jobs/:id recomputes enriched on read; new GET /api/jobs/:id/export?format=json|csv for website and ERP file downloads.
+- Eval over all 6 sample PDFs: 2 docs at 9/11, synthetic at 9/11, 3 thin docs at 4/11 (manufacturer missing, needs AI step). CSV has 38 columns throughout.
+- Leftover regex limits (table layouts like SOLO food-industry table, P01H/JEAN manufacturer) are flagged for the AI extract step, not more regex.
+
+### Goal 2 scoped
+- See Production/misc/WATERMARK_SCOPE.md. watermark.png is 2400x2400 RGBA with opaque black background, needs a transparent logo-only export.
+- Recommended engine: pdf-lib (pure JS, single deploy). Prerequisite: persist source uploads. API sketched (POST + GET watermark per job).
+
+## Progress Log (updated Oct 28 - Goal 2 frontend integration)
+
+### Watermark end-to-end (upload -> corner pick -> download)
+- backend/watermark.js: stampPdf supports upper-left, upper-right, lower-left,
+  lower-right, center (36pt margin, 18% width corners / 40% center, 15% opacity).
+  CLI takes an optional position arg. pdf-lib resolved from Production, repo root, or global.
+- backend/job-store-sqlite.js: jobs table gains filePath, watermarkFile, watermarkOptions
+  (ALTER TABLE migration, old DBs keep working).
+- backend/server.js: serves frontend static (index is the entry point at /),
+  persists uploads to data/uploads/<jobId>.pdf, new POST /api/jobs/:id/watermark
+  {position, opacity} and GET /api/jobs/:id/watermark download. Old jobs uploaded
+  before persistence need a re-upload before watermarking.
+- index.html + script.js + styles.css: watermark section appears after a successful
+  upload, 4-corner radio grid (lower-right default), Apply button, status line,
+  download link. API calls are relative paths now.
+- Note Oct 28: operator sandbox runs the live server; Goal 1 export endpoints were
+  re-landed in server.js after the Oct 27 file was found reverted on disk.
+
+## Progress Log (updated Oct 28 - upper-right default + footer position)
+
+### Watermark v2
+- Default position is now upper-right (watermark.js DEFAULTS, server fallback,
+  frontend preselected radio, script.js fallback).
+- New 5th position footer: full-width bottom band, max 12% of page height,
+  aspect preserved, centered (on A4 with Meta.png: 152x101pt at 36pt margin).
+  Band height tunable via footerBand option.
+- Frontend: footer radio added as a full-width row under the 2x2 corner grid.
+- Previews: misc/preview-footer.png. Operator live-tests on real PDFs.
+
+## Progress Log (updated Oct 28 - Goal 3 simple translation)
+
+### Translate what is possible (no OCR, no AI extraction yet)
+- New backend/translate.js: TARGET_LANGS en/pt/es, prompt builder with
+  never-translate rules (IDs, codes, numbers, units, cert codes stay exact),
+  applyTranslations fills only translatable field slots, translateRecord
+  orchestrates via meta-api chatJson (temperature 0, one call per request).
+- Server: POST /api/jobs/:id/translate {targetLang} validates lang, migrates
+  the record, translates fields + website description, persists slots and
+  translatedDescriptions on the record, returns applied list + model + note.
+  Missing key or API errors surface as 500 with the message.
+- Frontend: Translation section after upload, PT/ES/EN buttons, side-by-side
+  original arrow translated list plus fluent translated description. Saved
+  translations render instantly without spending tokens again.
+- Verified offline with stubbed API: slots fill, non-translatable stay null,
+  bad langs rejected, description cached per lang.
+- Operator live-runs with MODEL_API_KEY (+ MODEL_API_BASE) set; restart server
+  to pick up the new endpoint.
+
+## Progress Log (updated Oct 28 - model ID fix)
+
+### Translation 404 model_not_found
+- Cause: default model Llama-4-Maverick-17B-128E-Instruct-FP8 does not exist
+  on https://api.meta.ai/v1 (endpoint and key are fine, 9 models visible).
+- Fix: new npm run list-models (backend/list-models.js) prints usable IDs;
+  set MODEL_API_MODEL to a listed ID and restart the server. chatJson now
+  appends this hint to model_not_found errors.
+- Blank translation fields were the symptom of failed calls (nothing was
+  stored); they fill on the next successful click per language.
+
+## Progress Log (updated Oct 28 - translated file + encoding fix)
+
+### Encoding bug (fixed)
+- PowerShell had written the UI arrow and em dash as ? and U+FFFD, which is
+  what showed in the PT translation list. script.js now carries proper UTF-8
+  escapes. Lesson: keep non-ASCII out of PowerShell-written content.
+
+### Translated file (Goal 3 output)
+- New backend/report.js: bilingual PDF (header, all valued fields with
+  original + translation, findings, evidence quotes, review disclaimer).
+  Word-wrap + WinAnsi sanitizer unit-tested; pdf-lib lazy-required.
+- Server: GET /api/jobs/:id/report?lang=pt serves the bilingual PDF
+  (400 with a translate-first hint when that lang is missing).
+- Translated CSV: GET /api/jobs/:id/export?format=csv&lang=pt swaps in the
+  translated values (originals kept in __original columns).
+- Frontend: translation result gains report + CSV download links per language.
+- Default model is now muse-spark-1.3 (operator-tested on api.meta.ai).
+
+## Progress Log (updated Oct 28 - invisible language buttons)
+
+### Bug: white text on white buttons
+- Symptom: the 3 language buttons rendered as empty bars (labels were in
+  the HTML all along, even plain-ASCII English).
+- Cause: the global button rule sets color white on blue; the .lang-row
+  override changed the background to white without resetting the text
+  color. Classic specificity-per-property trap.
+- Fix: .lang-row button now sets color to the dark text variable, plus a
+  hover state. No server restart needed for CSS, just hard-refresh.
