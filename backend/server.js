@@ -20,6 +20,8 @@ const { migrateRecord } = require("./schema");
 const { stampPdf, POSITIONS, DEFAULTS } = require("./watermark");
 const { translateRecord, TARGET_LANGS, recordWithTranslations } = require("./translate");
 const { buildBilingualReport } = require("./report");
+const { buildCompanySheet, COMPANY_NAME_DEFAULT } = require("./company-template");
+const { buildCompanyJson } = require("./company-json");
 const { chatJson } = require("./meta-api");
 const { SqliteJobStore } = require("./job-store-sqlite");
 
@@ -194,6 +196,73 @@ const server = http.createServer(async function (request, response) {
         "Access-Control-Allow-Origin": "*"
       });
       response.end(bytes);
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // Goal 3b: standardized company-format data sheet (template render).
+  // GET /api/jobs/:id/company-sheet?lang=pt|es|en[&watermark=true]
+  // lang is optional (source-only sheet when omitted); missing translations
+  // render as placeholders so the sheet is always downloadable.
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/company-sheet$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = withEnrichment(store.get(id));
+    if (!job || !job.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    const lang = (parsed.searchParams.get("lang") || "").toLowerCase();
+    const useLang = TARGET_LANGS.indexOf(lang) !== -1 ? lang : null;
+    const wantWatermark = parsed.searchParams.get("watermark") === "true";
+    try {
+      let logoBytes = null;
+      try { logoBytes = await nodeFs.readFile(defaultLogoFile); } catch (e) { logoBytes = null; }
+      if (wantWatermark && !logoBytes) {
+        sendJson(response, 500, { error: "Logo file missing, cannot watermark the company sheet." });
+        return;
+      }
+      const bytes = await buildCompanySheet(job.record, job.findings || [], {
+        lang: useLang,
+        companyName: process.env.COMPANY_NAME || COMPANY_NAME_DEFAULT,
+        jobId: id,
+        logoPngBytes: logoBytes,
+        watermarkPngBytes: wantWatermark ? logoBytes : null,
+        watermarkOpacity: 0.08
+      });
+      response.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=\"" + id + "-company-sheet" + (useLang ? "-" + useLang : "") + ".pdf\"",
+        "Access-Control-Allow-Origin": "*"
+      });
+      response.end(bytes);
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // Day 29: canonical company JSON artifact (ERP + AI handoff download).
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/company-json$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = withEnrichment(store.get(id));
+    if (!job || !job.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    try {
+      const doc = buildCompanyJson(job, {
+        companyName: process.env.COMPANY_NAME || COMPANY_NAME_DEFAULT,
+        jobId: id
+      });
+      const body = JSON.stringify(doc, null, 2);
+      response.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": "attachment; filename=\"" + id + "-company.json\"",
+        "Access-Control-Allow-Origin": "*"
+      });
+      response.end(body);
     } catch (error) {
       sendJson(response, 500, { error: error.message });
     }

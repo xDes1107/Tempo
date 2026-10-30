@@ -201,3 +201,60 @@ Model API reachable at https://api.meta.ai/v1 (9 models visible).
   color. Classic specificity-per-property trap.
 - Fix: .lang-row button now sets color to the dark text variable, plus a
   hover state. No server restart needed for CSS, just hard-refresh.
+﻿
+## Progress Log (updated Oct 29 - standardized company format, Goal 3b)
+
+### Company template render (template first, faithful layout stays a stretch)
+- New backend/company-template.js: buildCompanySheet(record, findings, options)
+  renders the standardized company data sheet as A4 portrait PDF (pdf-lib):
+  header with company name + Meta.png logo, document control box (source file,
+  schema, engine, languages, date, job id), product identity + specification
+  rows (label | source value + unit | translated value or "(not translated)"),
+  website description (source + translated), quality findings, evidence quotes,
+  footer with page numbers + review disclaimer.
+- Locked defaults with env override: company name from COMPANY_NAME (default
+  "Meta"); A4 portrait; watermark opt-in per request (centered logo, 0.08).
+  Field order follows the locked schema v2.1 (identity first, then specs).
+- Server: GET /api/jobs/:id/company-sheet?lang=pt|es|en[&watermark=true].
+  lang is optional (source-only sheet when omitted); missing translations show
+  a placeholder instead of a 400 so the sheet is always downloadable.
+  Old GET /api/jobs/:id/report stays untouched.
+- Frontend: Company format section after translation (source/PT/ES/EN buttons
+  + watermark checkbox + download link); ASCII-only markup (PowerShell-safe).
+  Stray BOM chars from PS-written files stripped (index/styles/server/template).
+- Verified offline with node (pdf-lib present): Production/run_sheet_test.js
+  builds sheets from the real synthetic sample via extractor + validation;
+  asserts PDF magic, translated slots, watermark embed, env override, and
+  empty-record safety. Streams inflated to confirm all section strings render.
+  Sample outputs in Production/data/tmp/test-company-sheet-*.pdf for the
+  operator to open. Live server test left to the operator (sandbox no-network).
+- Open questions carried over for the operator: confirm company display name
+  (or set COMPANY_NAME and restart), any field-order changes, page size /
+  orientation, whether the watermark should default on. Faithful-layout
+  rebuild (Goal 3a) not started.
+﻿
+## Day 29 (Oct 29) - plan: company JSON handoff. KEEP SIMPLE.
+- Build: canonical company JSON artifact, one envelope per job (document
+  control + all 11 locked-schema fields + translations + website descriptions
+  + findings + ERP flat row + never-translate policy). New
+  backend/company-json.js (repackages stored job data, no AI call, offline),
+  GET /api/jobs/:id/company-json file download, frontend link next to the
+  company sheet. Reuses schema / enrich / translate / company-template.
+- Model note: translation model stays env-configurable (MODEL_API_MODEL,
+  default muse-spark-1.3). Operator choice SAM: run npm run list-models,
+  set MODEL_API_MODEL to the exact SAM model id, restart the server. No code
+  change needed. Caveat: if SAM means Segment Anything (vision segmentation),
+  it is NOT a text-translation model - keep a chat model for translation;
+  SAM-style segmentation fits the later visual-region-detection step instead.
+- Complexity ratings for what this JSON feeds next:
+  - ERP file import (JSON/CSV drop into the target system): LOW. The artifact
+    already carries the flat ERP row; remaining work is per-system column
+    mapping plus one supervised import test.
+  - ERP live API sync: MEDIUM. Needs target API docs, auth, idempotency and
+    error handling - outside demo scope, do file import first.
+  - AI Visual Translation (layout-aware PDF rebuild, Goal 3a stretch): HIGH.
+    Needs page rendering, text-region detection (where SAM-style segmentation
+    actually helps), per-region vision-model translation, and reflow without
+    breaking the layout. Hardest part of the project - attempt last.
+- Done criteria: endpoint returns the file, frontend downloads it, offline
+  node test passes, sample in data/tmp. Then commit.

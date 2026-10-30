@@ -203,3 +203,25 @@ input[type="file"]:focus-visible {
   color: var(--secondary-text-color);
   line-height: 1.6;
 }
+
+#company-format {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+#company-format label {
+  font-weight: normal;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+#sheet-download,
+#sheet-json-download {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--primary-color);
+  font-weight: bold;
+}

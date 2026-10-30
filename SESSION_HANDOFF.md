@@ -1,3 +1,7 @@
+Work project is in the Production folder. Read Production/SESSION_HANDOFF.md and continue with the standardized company format
+
+Hello again. Nice to see you! :)
+
 # Session handoff - Visual Translator (Oct 28, end of day)
 
 Read this first when resuming work. Companion docs: 01_Project_Overview.md,
@@ -67,3 +71,10 @@ pdf-lib for PDF stamping/generation, Meta Model API for AI steps.
 ## Tonight: commit everything
 - cd Production; git add -A; git commit -m "Oct 28: enrichment, watermark,
   translation + bilingual report"; git push (if a remote exists).
+﻿
+## Addendum Oct 29 - Goal 3b company template DONE (pending operator live-test)
+- backend/company-template.js + GET /api/jobs/:id/company-sheet + frontend
+  Company format section. Defaults: COMPANY_NAME env or "Meta", A4 portrait,
+  watermark opt-in. Details in the 03_Roadmap_v2.md log. Operator live-test:
+  restart the server, upload a PDF, click a company-sheet language button,
+  open the downloaded PDF.

@@ -19,6 +19,11 @@ const translationDescription = document.querySelector("#translation-description"
 const translationList = document.querySelector("#translation-list");
 const reportDownload = document.querySelector("#report-download");
 const csvDownload = document.querySelector("#csv-download");
+const companyFormat = document.querySelector("#company-format");
+const sheetDownload = document.querySelector("#sheet-download");
+const sheetWatermark = document.querySelector("#sheet-watermark");
+const sheetJsonDownload = document.querySelector("#sheet-json-download");
+let sheetLang = "";
 
 let currentLang = null;
 
@@ -38,6 +43,9 @@ fileInput.addEventListener("change", function () {
   currentJobId = null;
   currentRecord = null;
   translationSection.hidden = true;
+  companyFormat.hidden = true;
+  sheetDownload.hidden = true;
+  sheetJsonDownload.hidden = true;
   translationResult.hidden = true;
   reportDownload.hidden = true;
   csvDownload.hidden = true;
@@ -142,6 +150,9 @@ form.addEventListener("submit", async function (event) {
     currentJobId = result.jobId;
     currentRecord = result.record;
     translationSection.hidden = false;
+    companyFormat.hidden = false;
+    sheetLang = "";
+    updateSheetLink();
     translationResult.hidden = true;
   reportDownload.hidden = true;
   csvDownload.hidden = true;
@@ -294,3 +305,30 @@ document.querySelectorAll("#translation [data-lang]").forEach(function (button) 
     requestTranslation(button.getAttribute("data-lang"));
   });
 });
+
+// Company-format sheet (Goal 3b template render).
+function updateSheetLink() {
+  if (!currentJobId) {
+    sheetDownload.hidden = true;
+    sheetJsonDownload.hidden = true;
+    return;
+  }
+  let url = "/api/jobs/" + currentJobId + "/company-sheet";
+  const q = [];
+  if (sheetLang) q.push("lang=" + sheetLang);
+  if (sheetWatermark && sheetWatermark.checked) q.push("watermark=true");
+  if (q.length) url += "?" + q.join("&");
+  sheetDownload.href = url;
+  sheetDownload.hidden = false;
+  sheetJsonDownload.href = "/api/jobs/" + currentJobId + "/company-json";
+  sheetJsonDownload.hidden = false;
+}
+
+document.querySelectorAll("#company-format [data-sheet-lang]").forEach(function (button) {
+  button.addEventListener("click", function () {
+    sheetLang = button.getAttribute("data-sheet-lang") || "";
+    updateSheetLink();
+  });
+});
+
+sheetWatermark.addEventListener("change", updateSheetLink);
