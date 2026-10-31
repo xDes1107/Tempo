@@ -225,3 +225,129 @@ input[type="file"]:focus-visible {
   color: var(--primary-color);
   font-weight: bold;
 }
+/* Step 2 demo theme (Oct 31 night): dark background, red upload, 3-column triage. */
+:root {
+  --page-background: #0f1115;
+  --card-background: #161a22;
+  --text-color: #e8eaf0;
+  --secondary-text-color: #9aa3b2;
+  --border-color: #2a3140;
+  --primary-color: #2563eb;
+  --primary-hover-color: #1d4ed8;
+  --accent-red: #d61f2c;
+  --accent-red-hover: #a81520;
+}
+main {
+  max-width: 1200px;
+}
+form button {
+  background-color: var(--accent-red);
+}
+form button:hover {
+  background-color: var(--accent-red-hover);
+}
+input[type="file"] {
+  background-color: #0f1319;
+  color: var(--text-color);
+}
+.corner-grid label,
+.lang-row button,
+#ai-model {
+  background-color: #0f1319;
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+#ai-model {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  max-width: 220px;
+}
+.triage {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1fr;
+  gap: 0 28px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+.triage section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  margin-bottom: 32px;
+  min-width: 0;
+}
+.triage .tleft {
+  grid-column: 1;
+}
+.triage .tmid {
+  grid-column: 2;
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  padding-left: 28px;
+  padding-right: 28px;
+}
+.triage .tright {
+  grid-column: 3;
+}
+.triage .tfull {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border-color);
+  padding-top: 24px;
+}
+#analysis-results {
+  grid-row: 1;
+}
+#watermark {
+  grid-row: 1;
+}
+#company-format {
+  grid-row: 2;
+}
+#translation {
+  grid-row: 2;
+}
+#trust {
+  grid-row: 1 / span 2;
+}
+#trust h2 {
+  color: #ffb020;
+}
+#trust-list,
+#ai-review-list,
+#translation-list {
+  max-height: 320px;
+  overflow: auto;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+#trust-summary {
+  font-weight: bold;
+  color: var(--text-color);
+}
+@media (max-width: 900px) {
+  .triage {
+    grid-template-columns: 1fr;
+  }
+  .triage .tleft,
+  .triage .tmid,
+  .triage .tright,
+  .triage .tfull {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .triage .tmid {
+    border-left: none;
+    border-right: none;
+    padding-left: 0;
+    padding-right: 0;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+  #trust {
+    grid-row: auto;
+  }
+}

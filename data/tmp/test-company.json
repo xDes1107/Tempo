@@ -1,14 +1,14 @@
 {
-  "artifact": "visual-translator/company-document",
-  "artifactVersion": "1.0.0-2026-10-29",
+  "artifact": "dataforge/company-document",
+  "artifactVersion": "1.1.0-2026-10-30",
   "generatedAt": "2026-10-29T00:00:00.000Z",
-  "companyName": "Meta",
+  "companyName": "DEXIS",
   "jobId": "test-json-1",
   "documentControl": {
     "sourceDocument": "synthetic-glove-sample.pdf",
     "storedPdf": "data/uploads/test-json-1.pdf",
-    "schemaVersion": "2.1.0-2026-10-28",
-    "extractionEngine": "deterministic-rules-v2.1",
+    "schemaVersion": "2.2.0-2026-10-30",
+    "extractionEngine": "deterministic-rules-v2.2",
     "jobStatus": "completed",
     "pageCount": null,
     "createdAt": "2026-10-29T00:00:00.000Z",
@@ -93,6 +93,14 @@
       "translatable": true,
       "translation": null
     },
+    "description": {
+      "value": null,
+      "originalValue": null,
+      "unit": null,
+      "evidence": [],
+      "translatable": true,
+      "translation": null
+    },
     "materials": {
       "value": null,
       "originalValue": null,
@@ -133,6 +141,14 @@
         }
       ],
       "translatable": false,
+      "translation": null
+    },
+    "colors": {
+      "value": "Midnight blue",
+      "originalValue": "Colour: Midnight blue",
+      "unit": null,
+      "evidence": [],
+      "translatable": true,
       "translation": null
     },
     "standardsAndCertifications": {
@@ -193,19 +209,43 @@
       "evidence": [],
       "translatable": true,
       "translation": null
+    },
+    "categorization": {
+      "value": "PPE -> GLOVES -> Anticut protection",
+      "originalValue": "PPE -> GLOVES -> Anticut protection",
+      "unit": null,
+      "evidence": [],
+      "translatable": false,
+      "translation": null
+    },
+    "ean": {
+      "value": "4006381333931",
+      "originalValue": "EAN: 4006381333931",
+      "unit": null,
+      "evidence": [],
+      "translatable": false,
+      "translation": null
+    },
+    "orderInfo": {
+      "value": "Box of 100",
+      "originalValue": "Box of 100",
+      "unit": null,
+      "evidence": [],
+      "translatable": false,
+      "translation": null
     }
   },
   "descriptions": {
-    "source": "KRYTECH 563 by MAPA SAS - Cut protection EN 388 Sizes 7 8 9 10 11. Dimensions: 23-27. Sizes: 7 8 9 10 11. Standards: EN 388. Performance: 7 8 9 10 11.",
+    "source": "KRYTECH 563 by MAPA SAS - Cut protection EN 388 Sizes 7 8 9 10 11. Dimensions: 23-27. Sizes: 7 8 9 10 11. Colors: Midnight blue. Standards: EN 388. Performance: 7 8 9 10 11.",
     "translated": {
       "pt": "Descricao fluente de teste."
     }
   },
   "findings": [],
   "erp": {
-    "schemaVersion": "2.1.0-2026-10-28",
+    "schemaVersion": "2.2.0-2026-10-30",
     "documentName": "synthetic-glove-sample.pdf",
-    "extractionEngine": "deterministic-rules-v2.1",
+    "extractionEngine": "deterministic-rules-v2.2",
     "productName": "KRYTECH 563",
     "productName__original": "KRYTECH 563",
     "productName__unit": "",
@@ -218,6 +258,9 @@
     "categoryOrIntendedUse": "Cut protection EN 388 Sizes 7 8 9 10 11",
     "categoryOrIntendedUse__original": "Cut protection EN 388 Sizes 7 8 9 10 11",
     "categoryOrIntendedUse__unit": "",
+    "description": "",
+    "description__original": "",
+    "description__unit": "",
     "materials": "",
     "materials__original": "",
     "materials__unit": "",
@@ -227,6 +270,9 @@
     "sizesAvailable": "7 8 9 10 11",
     "sizesAvailable__original": "7 8 9 10 11",
     "sizesAvailable__unit": "",
+    "colors": "Midnight blue",
+    "colors__original": "Colour: Midnight blue",
+    "colors__unit": "",
     "standardsAndCertifications": "EN 388",
     "standardsAndCertifications__original": "EN 388",
     "standardsAndCertifications__unit": "",
@@ -239,8 +285,17 @@
     "industriesOrApplications": "",
     "industriesOrApplications__original": "",
     "industriesOrApplications__unit": "",
+    "categorization": "PPE -> GLOVES -> Anticut protection",
+    "categorization__original": "PPE -> GLOVES -> Anticut protection",
+    "categorization__unit": "",
+    "ean": "4006381333931",
+    "ean__original": "EAN: 4006381333931",
+    "ean__unit": "",
+    "orderInfo": "Box of 100",
+    "orderInfo__original": "Box of 100",
+    "orderInfo__unit": "",
     "findingsCount": 0,
-    "websiteDescription": "KRYTECH 563 by MAPA SAS - Cut protection EN 388 Sizes 7 8 9 10 11. Dimensions: 23-27. Sizes: 7 8 9 10 11. Standards: EN 388. Performance: 7 8 9 10 11."
+    "websiteDescription": "KRYTECH 563 by MAPA SAS - Cut protection EN 388 Sizes 7 8 9 10 11. Dimensions: 23-27. Sizes: 7 8 9 10 11. Colors: Midnight blue. Standards: EN 388. Performance: 7 8 9 10 11."
   },
   "translationPolicy": {
     "supportedLanguages": [
@@ -252,7 +307,8 @@
       "product identifiers and model/reference codes",
       "numeric values and quantities",
       "units of measure",
-      "standards and certification codes (e.g. EN 388, ISO 13997)"
+      "standards and certification codes (e.g. EN 388, ISO 13997)",
+      "barcodes (EAN/GTIN) and order quantities"
     ]
   }
 }

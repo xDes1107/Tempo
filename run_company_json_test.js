@@ -1,4 +1,4 @@
-﻿const fs = require("node:fs");
+const fs = require("node:fs");
 const assert = require("node:assert");
 const { PDFParse } = require("pdf-parse");
 const { extractProductData } = require("./backend/extractor");
@@ -27,12 +27,27 @@ async function main() {
     filePath: "data/uploads/test-json-1.pdf",
     watermarkOptions: { position: "upper-right", opacity: 0.15 }
   };
-  const doc = mod.buildCompanyJson(job, { companyName: "Meta", generatedAt: "2026-10-29T00:00:00.000Z" });
+  record.fields.colors.value = "Midnight blue";
+  record.fields.colors.originalValue = "Colour: Midnight blue";
+  record.fields.categorization.value = "PPE -> GLOVES -> Anticut protection";
+  record.fields.categorization.originalValue = "PPE -> GLOVES -> Anticut protection";
+  record.fields.ean.value = "4006381333931";
+  record.fields.ean.originalValue = "EAN: 4006381333931";
+  record.fields.orderInfo.value = "Box of 100";
+  record.fields.orderInfo.originalValue = "Box of 100";
+  const doc = mod.buildCompanyJson(job, { companyName: "DEXIS", generatedAt: "2026-10-29T00:00:00.000Z" });
 
-  assert.strictEqual(doc.artifact, "visual-translator/company-document");
+  assert.strictEqual(doc.artifact, "dataforge/company-document");
   assert.strictEqual(doc.artifactVersion, mod.ARTIFACT_VERSION);
   assert.strictEqual(doc.jobId, "test-json-1");
-  assert.strictEqual(doc.companyName, "Meta");
+  assert.strictEqual(doc.companyName, "DEXIS");
+  assert.strictEqual(doc.fields.colors.value, "Midnight blue");
+  assert.strictEqual(doc.fields.categorization.value, "PPE -> GLOVES -> Anticut protection");
+  assert.strictEqual(doc.fields.ean.value, "4006381333931");
+  assert.strictEqual(doc.fields.orderInfo.value, "Box of 100");
+  assert.strictEqual(doc.erp.ean, "4006381333931");
+  assert.strictEqual(doc.erp.colors, "Midnight blue");
+  assert.strictEqual(doc.erp.orderInfo, "Box of 100");
   FIELD_KEYS.forEach(function (k) { assert.ok(doc.fields[k], "field present: " + k); });
   assert.ok(doc.fields.productName.value, "productName valued");
   assert.strictEqual(doc.fields.productName.translation.translatedValue, "Luva de teste");

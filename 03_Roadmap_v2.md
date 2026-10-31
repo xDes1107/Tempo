@@ -1,4 +1,4 @@
-# Visual Translator — Roadmap v2
+# DataForge — Roadmap v2
 Oct 27 - Nov 3 | Lightweight demo with translation
 
 ## New Constraints
@@ -258,3 +258,162 @@ Model API reachable at https://api.meta.ai/v1 (9 models visible).
     breaking the layout. Hardest part of the project - attempt last.
 - Done criteria: endpoint returns the file, frontend downloads it, offline
   node test passes, sample in data/tmp. Then commit.
+
+## Roadmap v3 - DataForge (Oct 30, 2026)
+
+Rename: Visual Translator -> DataForge. Core reframed as
+extraction -> standardized outputs (Company JSON + Company PDF).
+Translation and image manipulation are supporting features.
+ERP integration OFF. Faithful-layout rebuild CUT as a goal.
+
+### Done (built; pending operator live-test)
+
+- Schema v2.1 locked (11 fields), deterministic extractor v2.1,
+  tolerant validation, enrichment (website description, 38-col ERP
+  row/CSV, AI prompt builder), export endpoint (json/csv).
+- Watermark end to end (6 positions, default upper-right, 0.15,
+  transparent Meta.png logo) + opt-in sheet watermark.
+- Translation EN/PT/ES (translatable fields only, never-translate
+  list enforced) + bilingual report + translated CSV.
+- Company sheet PDF (A4 portrait, COMPANY_NAME env, default "Meta").
+- Company JSON envelope (artifact dataforge/company-document v1.1).
+- Offline tests green: run_sheet_test.js + run_company_json_test.js.
+
+### Next (in order)
+
+1. Operator live-test: restart server, upload a PDF, download the
+   company sheet + company JSON, confirm contents.
+2. Confirm COMPANY_NAME header default + open questions (field
+   order, page size/orientation, watermark default-on?).
+3. Polish pass: fix any live-test findings; refresh README/demo
+   notes under the DataForge name.
+4. Deploy prep: single service + SQLite file volume (Render / Fly.io
+   / HuggingFace); sample PDFs bundled; demo + video.
+5. Stretch only if time remains: AI extraction for missed
+   manufacturers / table layouts; faithful-layout rebuild stays
+   HIGH complexity - attempt last, if ever.
+
+### Cut / parked
+
+- CUT as a goal: faithful-layout PDF rebuild (kept as stretch only).
+- OFF: ERP file-import mapping test (no access), ERP live API sync.
+- PARKED: more regex work (reserved for the AI-extraction step).
+## Progress Log (Oct 30 pm - DEXIS standard sheet v2)
+
+- Schema v2.2 (16 fields): added optional description, colors,
+  categorization, ean, orderInfo. Labels renamed for the sheet:
+  Norms (= standardsAndCertifications), Sizes. DO_NOT_TRANSLATE
+  extended with barcodes/order quantities. Old records migrate
+  cleanly (validation/ERP/translate/JSON are FIELD_KEYS-driven).
+- Extractor v2.2: description/color/EAN (check-digit verified) /
+  order-quantity finders. Real-sample hits: JEAN colors + pack,
+  SOLO colors + carton, DURACOIL polybag line. No false positives
+  on the other samples. Categorization has no finder yet - the
+  DEXIS taxonomy (PPE -> GLOVES -> ...) arrives as an upload later.
+- Company sheet v2: DEXIS logo upper-left, company name beside it,
+  hero band (product image left, Manufacturer/Description/Norms/
+  Sizes/Colors/Categorization right), Ordering block only when
+  found, then control/specs/descriptions/findings/evidence.
+- Product image: new backend/product-image.js extracts the largest
+  embedded JPEG (DCTDecode) from the source PDF, best-effort with
+  placeholder fallback. Works on activarmr/JEAN/SOLO samples.
+  Found real bug: pdf-lib 1.17.1 embedJpg misreads Node Buffers
+  with nonzero byteOffset ("SOI not found") - template now copies
+  all embed inputs through clean offset-0 Uint8Arrays.
+- Defaults switched to DEXIS: COMPANY_NAME default, watermark +
+  sheet logo now misc/DEXIS.png (operator logo kept, Meta.png
+  stays on disk as history).
+- Tests green: run_sheet_test.js (section-string asserts via
+  inflate+hex-decode, commercial record, real-image embed) +
+  run_company_json_test.js (DEXIS + new-field flow). Sample
+  Company-JSON.json regenerated (16 fields). New sample sheet
+  data/tmp/test-company-sheet-commercial.pdf.
+
+
+  # OPERATOR ADDED
+
+  ROAD MAP IDEA:
+
+  TO BE RUN AS AN .EXE or something locally on the users machine
+
+  01
+Intake
+
+Bring information into Tempo.
+- Upload PDF documents
+- Inspect document structure
+- Extract text, tables and images
+
+
+02
+Extraction
+
+Understand and retrieve information.
+- Identify relevant information
+- Extract structured fields
+- Classify and categorize content
+
+
+03
+Enrichment
+
+Make information consistent and useful.
+- Normalize units and terminology
+- Standardize field names
+- Apply classification rules
+- Organize information into a canonical data model
+
+
+04
+Validation & Review <-- Not Implemented
+
+Establish whether the extracted information is trustworthy.
+- Identify missing or inconsistent fields
+- Link values to their original document pages
+- Highlight potential extraction errors
+- Allow users to correct and approve results
+
+
+05
+Output
+
+Deliver information in the format people need.
+- Standard JSON output
+- CSV and XLSX exports <-- We'll use this for now.
+- PDF reports and technical sheets
+- Future custom schemas and ERP integrations
+
+# Trust Report:
+
+Tempo Trust Report <-- Production name is DataForge. Final will be Tempo.
+
+Recommended
+
+92%
+Illustrative document quality score, not a calibrated probability
+
+Fields extracted
+
+50
+
+Source-supported fields
+
+46
+
+Missing fields
+
+2
+
+Fields requiring review
+
+2
+
+
+Example field
+Material
+Source found
+
+Stainless steel
+
+Page 4 · Supporting text available
+Illustrative interface, not an actual extraction result.

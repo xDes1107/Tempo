@@ -1,4 +1,4 @@
-# Visual Translator — System Architecture
+# DataForge — System Architecture
 
 **Status:** Initial proposal  
 **Version:** 0.1  
@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-Visual Translator is an AI-powered document understanding and data quality application designed initially for construction product technical datasheets.
+DataForge is an AI-powered document understanding and data quality application designed initially for construction product technical datasheets.
 
 The system processes PDF documents, interprets their technical content, extracts structured product information, validates the extracted data, and generates a report containing findings and source evidence.
 

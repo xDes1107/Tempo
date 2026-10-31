@@ -1,21 +1,26 @@
 ﻿"use strict";
-// Goal 3b - standardized company-format document render.
+// DataForge - standardized company-format document render (v2, DEXIS).
 // buildCompanySheet(record, findings, options) -> Promise<Buffer> (A4 PDF).
 //
-// Template render from the locked schema (schema.js v2.1): company header
-// with logo, document control box, product identity + specification rows
-// (source value alongside the translated value), website descriptions,
-// quality findings, evidence quotes, footer with pagination + disclaimer.
+// Layout: DEXIS logo upper-left + company name, product title, hero band
+// (product image left, key fields right), document control box, ordering
+// block (EAN / quantities, only when found), specifications, website
+// descriptions, quality findings, evidence quotes, footer + disclaimer.
 //
-// Faithful-layout rebuild of the supplier original is explicitly out of
-// scope (later stretch); this template IS the company standard output.
+// Schema v2.2 fields feed the sheet: manufacturer, description, norms
+// (= standardsAndCertifications), sizes + colors (only if applicable),
+// categorization (taxonomy path, placeholder until the taxonomy upload),
+// ean + orderInfo (only if found). All other valued fields render in
+// Specifications; empty fields are skipped (sheet is always downloadable).
 //
 // Locked defaults (operator-tunable without code edits):
-// - Company display name: process.env.COMPANY_NAME, default "Meta".
+// - Company display name: process.env.COMPANY_NAME, default "DEXIS".
 // - Page: A4 portrait, 48pt margins. Fixed for the demo.
 // - Watermark on the template: opt-in per request (watermarkPngBytes set),
-//   drawn centered at low opacity, same look as the Goal 2 stamp.
-// - Logo: Meta.png bytes passed in as logoPngBytes (may be null -> skipped).
+//   drawn centered at low opacity, same look as the stamp step.
+// - Logo: DEXIS.png bytes passed in as logoPngBytes (may be null -> skipped).
+// - Product image: JPEG bytes passed in as productImageBytes (extracted
+//   best-effort from the source PDF); placeholder frame when absent.
 // pdf-lib is lazy-required (same pattern as report.js / watermark.js).
 
 const path = require("node:path");
@@ -24,14 +29,20 @@ const { LANG_NAMES } = require("./translate");
 const { buildWebsiteDescription } = require("./enrich");
 const { sanitize, wrapText } = require("./report");
 
-const COMPANY_NAME_DEFAULT = "Meta";
+const COMPANY_NAME_DEFAULT = "DEXIS";
 const PAGE_W = 595;
 const PAGE_H = 842;
 const MARGIN = 48;
+const LOGO_H = 40;
+const IMG_BOX_W = 150;
+const IMG_MIN_H = 120;
 
 const IDENTITY_KEYS = ["productName", "manufacturer", "modelOrReference", "categoryOrIntendedUse"];
-const SPEC_KEYS = ["materials", "dimensions", "sizesAvailable", "standardsAndCertifications",
-  "protectionLevelsOrPerformance", "usageRestrictionsOrWarnings", "industriesOrApplications"];
+const HERO_KEYS = ["manufacturer", "description", "standardsAndCertifications", "sizesAvailable", "colors", "categorization"];
+const COMMERCIAL_KEYS = ["ean", "orderInfo"];
+const SPEC_KEYS = ["materials", "dimensions",
+  "protectionLevelsOrPerformance", "usageRestrictionsOrWarnings", "industriesOrApplications",
+  "categoryOrIntendedUse"];
 
 function readCompanyName() {
   const v = (process.env.COMPANY_NAME || "").trim();
@@ -56,6 +67,12 @@ function loadPdfLib() {
     } catch (e) { tried.push(c); }
   }
   throw new Error("pdf-lib is not installed (looked in: " + tried.join("; ") + "). Run INSIDE the Production folder: npm install pdf-lib.");
+}
+
+function cleanBytes(b) {
+  if (!b || !b.length) return null;
+  const u = b instanceof Uint8Array ? b : new Uint8Array(b);
+  return new Uint8Array(u);
 }
 
 function valueText(f) {
@@ -92,7 +109,14 @@ async function buildCompanySheet(record, findings, options) {
 
   let logo = null;
   if (opts.logoPngBytes) {
-    try { logo = await pdf.embedPng(opts.logoPngBytes); } catch (e) { logo = null; }
+    try { logo = await pdf.embedPng(cleanBytes(opts.logoPngBytes)); } catch (e) { logo = null; }
+  }
+  let productImg = null;
+  if (opts.productImageBytes) {
+    try { productImg = await pdf.embedJpg(cleanBytes(opts.productImageBytes)); }
+    catch (e1) {
+      try { productImg = await pdf.embedPng(cleanBytes(opts.productImageBytes)); } catch (e2) { productImg = null; }
+    }
   }
 
   let page = pdf.addPage([PAGE_W, PAGE_H]);
@@ -156,13 +180,20 @@ async function buildCompanySheet(record, findings, options) {
     y -= 6;
   }
 
-  // Header: company name + logo, document title.
+  // Header: DEXIS logo upper-left, company name beside it, title below.
+  let headX = MARGIN; let logoBottom = null;
   if (logo) {
-    const lh = 36;
-    const lw = lh * (logo.width / logo.height);
-    page.drawImage(logo, { x: PAGE_W - MARGIN - lw, y: y - lh + 14, width: lw, height: lh });
+    const lw = Math.min(LOGO_H * (logo.width / logo.height), 140); const lh = lw * (logo.height / logo.width);
+    page.drawImage(logo, { x: MARGIN, y: y - lh + 6, width: lw, height: lh }); logoBottom = y - lh + 6;
+    headX = MARGIN + lw + 12;
   }
-  para(companyName, 17, bold, 22);
+  const headLines = wrapText(companyName, bold, 17, contentW - (headX - MARGIN));
+  headLines.forEach(function (ln) {
+    page.drawText(ln, { x: headX, y: y, size: 17, font: bold, color: lib.rgb(0, 0, 0) });
+    y -= 22;
+  });
+  y -= 2;
+  if (logoBottom !== null && y - 14 < logoBottom) { y = logoBottom - 22; }
   para("Standardized Product Data Sheet", 12, font, 16);
   drawRule();
 
@@ -171,10 +202,70 @@ async function buildCompanySheet(record, findings, options) {
     (f.modelOrReference && f.modelOrReference.value) ||
     safeRecord.documentName || "Unknown product";
   para(title, 14, bold, 19);
-  if (f.manufacturer && f.manufacturer.value) {
-    para("Manufacturer: " + f.manufacturer.value, 10, font, 13);
-  }
   y -= 2;
+
+  // Hero band: product image left, key fields right.
+  const heroRows = [];
+  ["manufacturer", "description", "standardsAndCertifications", "sizesAvailable", "colors"].forEach(function (key) {
+    const field = f[key];
+    if (!field || !field.value) return;
+    heroRows.push({ label: labelOf(key), source: valueText(field), translated: translatedText(field, lang) });
+  });
+  const catField = f.categorization;
+  heroRows.push({
+    label: labelOf("categorization"),
+    source: (catField && catField.value) ? catField.value : "(taxonomy upload pending)",
+    translated: (catField && catField.value) ? translatedText(catField, lang) : null
+  });
+  const textX = MARGIN + IMG_BOX_W + 14;
+  const textW = contentW - IMG_BOX_W - 14;
+  const heroWrapped = heroRows.map(function (r) {
+    return [
+      wrapText(r.label, bold, 10, textW - 6),
+      wrapText("Source: " + r.source, font, 10, textW - 6)
+    ].concat(r.translated !== null && r.translated !== undefined
+      ? [wrapText((langName || "Translated") + ": " + r.translated, font, 10, textW - 6)]
+      : []);
+  });
+  let heroH = 10;
+  heroWrapped.forEach(function (w) { w.forEach(function (lines) { heroH += lines.length * 13; }); heroH += 6; });
+  if (heroH < IMG_MIN_H) heroH = IMG_MIN_H;
+  ensure(heroH + 8);
+  const heroTop = y;
+  if (productImg) {
+    const scale = Math.min(IMG_BOX_W / productImg.width, (heroH - 8) / productImg.height);
+    const iw = productImg.width * scale;
+    const ih = productImg.height * scale;
+    page.drawImage(productImg, { x: MARGIN + (IMG_BOX_W - iw) / 2, y: heroTop - heroH + (heroH - ih) / 2, width: iw, height: ih });
+  } else {
+    page.drawRectangle({
+      x: MARGIN, y: heroTop - heroH, width: IMG_BOX_W, height: heroH,
+      borderColor: lib.rgb(0.65, 0.65, 0.65), borderWidth: 1
+    });
+    page.drawText("Product image", {
+      x: MARGIN + 12, y: heroTop - heroH / 2, size: 9, font: font, color: lib.rgb(0.45, 0.45, 0.45)
+    });
+  }
+  page.drawRectangle({ x: MARGIN, y: heroTop - heroH, width: contentW, height: heroH, borderColor: lib.rgb(0.78, 0.82, 0.88), borderWidth: 1 });
+  page.drawLine({ start: { x: textX - 7, y: heroTop - 4 }, end: { x: textX - 7, y: heroTop - heroH + 4 }, thickness: 1, color: lib.rgb(0.78, 0.82, 0.88) });
+  let stripe = false;
+  heroWrapped.forEach(function (w, idx) {
+    if (stripe) {
+      let rh = 6;
+      w.forEach(function (lines) { rh += lines.length * 13; });
+      page.drawRectangle({ x: textX - 4, y: y - rh + 4, width: textW, height: rh, color: lib.rgb(0.945, 0.957, 0.98) });
+    }
+    stripe = !stripe;
+    w.forEach(function (lines, li) {
+      lines.forEach(function (ln) {
+        page.drawText(sanitize(ln), { x: textX, y: y, size: 10, font: li === 0 ? bold : font, color: lib.rgb(0, 0, 0) });
+        y -= 13;
+      });
+    });
+    y -= 6;
+  });
+  if (y > heroTop - heroH) y = heroTop - heroH;
+  y -= 8;
 
   // Document control box.
   heading("Document control");
@@ -191,21 +282,28 @@ async function buildCompanySheet(record, findings, options) {
     specRow(row[0], row[1], null, idx % 2 === 1);
   });
 
-  // Product identity, then specifications (schema order in each group).
-  heading("Product identity");
-  IDENTITY_KEYS.forEach(function (key, idx) {
-    const field = f[key];
-    if (!field || !field.value) return;
-    specRow(labelOf(key), valueText(field), translatedText(field, lang), idx % 2 === 1);
-  });
+  // Ordering block: only when EAN / quantities were found.
+  const eanF = f.ean;
+  const ordF = f.orderInfo;
+  if ((eanF && eanF.value) || (ordF && ordF.value)) {
+    heading("Ordering");
+    let ostripe = false;
+    COMMERCIAL_KEYS.forEach(function (key) {
+      const field = f[key];
+      if (!field || !field.value) return;
+      specRow(labelOf(key), valueText(field), translatedText(field, lang), ostripe);
+      ostripe = !ostripe;
+    });
+  }
 
+  // Specifications: everything valued outside hero + ordering.
   heading("Specifications");
-  let stripe = false;
+  let sstripe = false;
   SPEC_KEYS.forEach(function (key) {
     const field = f[key];
     if (!field || !field.value) return;
-    specRow(labelOf(key), valueText(field), translatedText(field, lang), stripe);
-    stripe = !stripe;
+    specRow(labelOf(key), valueText(field), translatedText(field, lang), sstripe);
+    sstripe = !sstripe;
   });
   if (!SPEC_KEYS.some(function (key) { return f[key] && f[key].value; })) {
     para("No specification values extracted.", 10, font, 13);
@@ -250,7 +348,7 @@ async function buildCompanySheet(record, findings, options) {
   // Second pass: optional watermark stamp + footer with pagination.
   let wm = null;
   if (opts.watermarkPngBytes) {
-    try { wm = await pdf.embedPng(opts.watermarkPngBytes); } catch (e) { wm = null; }
+    try { wm = await pdf.embedPng(cleanBytes(opts.watermarkPngBytes)); } catch (e) { wm = null; }
   }
   const pages = pdf.getPages();
   pages.forEach(function (p, i) {
@@ -278,5 +376,7 @@ module.exports = {
   readCompanyName: readCompanyName,
   COMPANY_NAME_DEFAULT: COMPANY_NAME_DEFAULT,
   IDENTITY_KEYS: IDENTITY_KEYS,
+  HERO_KEYS: HERO_KEYS,
+  COMMERCIAL_KEYS: COMMERCIAL_KEYS,
   SPEC_KEYS: SPEC_KEYS
 };

@@ -1,27 +1,32 @@
 "use strict";
-// Visual Translator - 11-field product schema.
-// Version: 2.1.0-2026-10-28 (Goal 1 enrichment: adds optional
-// industriesOrApplications caught on DURACOIL eval Oct 28).
+// DataForge - 16-field product schema.
+// Version: 2.2.0-2026-10-30 (DEXIS sheet polish: adds optional description,
+// colors, categorization, ean, orderInfo for the commercial block).
 // Every extracted field keeps: value (normalized, source language),
 // originalValue (verbatim), unit (never translated), evidence (source
 // quotes pointing at the PDF), translatable flag, and a translation
-// slot filled later by the Meta Model API step (Goal 3).
+// slot filled later by the Meta Model API step.
 
-const SCHEMA_VERSION = "2.1.0-2026-10-28";
-const SUPPORTED_SCHEMA_VERSIONS = ["2.0.0-locked-2026-10-27", SCHEMA_VERSION];
+const SCHEMA_VERSION = "2.2.0-2026-10-30";
+const SUPPORTED_SCHEMA_VERSIONS = ["2.0.0-locked-2026-10-27", "2.1.0-2026-10-28", SCHEMA_VERSION];
 
 const FIELDS = [
   { key: "productName", label: "Product name", required: true, translatable: true, allowsUnit: false },
   { key: "manufacturer", label: "Manufacturer", required: true, translatable: false, allowsUnit: false },
   { key: "modelOrReference", label: "Model / reference", required: true, translatable: false, allowsUnit: false },
   { key: "categoryOrIntendedUse", label: "Category / intended use", required: false, translatable: true, allowsUnit: false },
+  { key: "description", label: "Description", required: false, translatable: true, allowsUnit: false },
   { key: "materials", label: "Materials", required: false, translatable: true, allowsUnit: false },
   { key: "dimensions", label: "Dimensions", required: false, translatable: false, allowsUnit: true },
-  { key: "sizesAvailable", label: "Sizes available", required: false, translatable: false, allowsUnit: false },
-  { key: "standardsAndCertifications", label: "Standards / certifications", required: false, translatable: false, allowsUnit: false },
+  { key: "sizesAvailable", label: "Sizes", required: false, translatable: false, allowsUnit: false },
+  { key: "colors", label: "Colors", required: false, translatable: true, allowsUnit: false },
+  { key: "standardsAndCertifications", label: "Norms", required: false, translatable: false, allowsUnit: false },
   { key: "protectionLevelsOrPerformance", label: "Protection levels / performance", required: false, translatable: false, allowsUnit: true },
   { key: "usageRestrictionsOrWarnings", label: "Usage restrictions / warnings", required: false, translatable: true, allowsUnit: false },
-  { key: "industriesOrApplications", label: "Industries / applications", required: false, translatable: true, allowsUnit: false }
+  { key: "industriesOrApplications", label: "Industries / applications", required: false, translatable: true, allowsUnit: false },
+  { key: "categorization", label: "Categorization", required: false, translatable: false, allowsUnit: false },
+  { key: "ean", label: "EAN / barcode", required: false, translatable: false, allowsUnit: false },
+  { key: "orderInfo", label: "Order / pack quantities", required: false, translatable: false, allowsUnit: false }
 ];
 
 const FIELD_KEYS = FIELDS.map(function (f) { return f.key; });
@@ -32,7 +37,8 @@ const DO_NOT_TRANSLATE = [
   "product identifiers and model/reference codes",
   "numeric values and quantities",
   "units of measure",
-  "standards and certification codes (e.g. EN 388, ISO 13997)"
+  "standards and certification codes (e.g. EN 388, ISO 13997)",
+  "barcodes (EAN/GTIN) and order quantities"
 ];
 
 function fieldDef(key) {
@@ -62,7 +68,7 @@ function createEmptyRecord(documentName, extractionEngine) {
   return {
     schemaVersion: SCHEMA_VERSION,
     documentName: documentName || null,
-    extractionEngine: extractionEngine || "deterministic-rules-v2.1",
+    extractionEngine: extractionEngine || "deterministic-rules-v2.2",
     fields: fields
   };
 }
@@ -73,7 +79,7 @@ function makeEvidence(page, quote, charRange) {
   return ev;
 }
 
-// Backward compat: Oct 27 10-field records validate and migrate cleanly.
+// Backward compat: older records validate and migrate cleanly.
 // Missing optional fields are filled with empty slots, version is bumped.
 function migrateRecord(record) {
   if (!record || !record.fields) return record;

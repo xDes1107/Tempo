@@ -1,6 +1,6 @@
 "use strict";
-// Deterministic extraction mapped onto the 11-field schema (v2.1).
-// Method: deterministic-rules-v2.1. Regex candidates only -
+// Deterministic extraction mapped onto the 16-field schema (v2.2).
+// Method: deterministic-rules-v2.2. Regex candidates only -
 // every value needs human review. AI (Meta Model API) replaces the
 // finders next but keeps this output shape and evidence contract.
 
@@ -145,24 +145,77 @@ function findIndustriesOrApplications(text) {
   return m ? cleanIndustryValue(m[0]) : null;
 }
 
+function findDescription(text) {
+  const labeled = text.match(/(?:^|\n)\s*Descriptions?\s*:?\s*([^\n\r]{20,300})/i);
+  if (labeled) return labeled[1].trim().replace(/^[\u2022\-\*]+\s*/, "").replace(/\s+/g, " ");
+  return null;
+}
+
+function findColors(text) {
+  const m = text.match(/(?:colou?rs?|colourway|coloris)\s*:?\s*([A-Za-z][^\n\r]{1,80})/i);
+  if (!m) return null;
+  return m[1].trim().replace(/^[\u2022\-\*]+\s*/, "").replace(/[;,.:\-]+$/, "").trim().slice(0, 120) || null;
+}
+
+function gtinCheckOk(digits) {
+  const s = String(digits).replace(/\D/g, "");
+  if (!/^(8|12|13|14)$/.test(String(s.length))) return false;
+  let sum = 0;
+  for (let i = 0; i < s.length - 1; i++) {
+    const d = parseInt(s[i], 10);
+    const fromRight = s.length - 1 - i;
+    sum += fromRight % 2 === 1 ? d * 3 : d;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return check === parseInt(s[s.length - 1], 10);
+}
+
+function findEan(text) {
+  const kw = text.match(/(?:EAN(?:-?13)?|GTIN|bar-?codes?)\s*:?\s*([0-9][0-9 .\-]{7,20})/i);
+  if (kw) {
+    const digits = kw[1].replace(/\D/g, "");
+    if (digits.length >= 8 && digits.length <= 14 && gtinCheckOk(digits)) return digits;
+  }
+  const bare = text.match(/(?<![0-9])[0-9]{13}(?![0-9])/);
+  if (bare && gtinCheckOk(bare[0])) return bare[0];
+  return null;
+}
+
+function findOrderInfo(text) {
+  const parts = [];
+  const moq = text.match(/(?:MOQ|minimum order|min\.?\s*order(?:ing)?(?: quantity)?)\s*:?\s*([^\n\r]{1,60})/i);
+  if (moq) parts.push("Min order: " + moq[1].trim().replace(/^[\u2022\-\*]+\s*/, "").replace(/\s+/g, " "));
+  const pack = text.match(/((?:[A-Za-z]+\s+){0,3}?(?:[A-Za-z]*?(?:box|pack|carton|case|bag|inner)(?:s|es)?)(?: of \d[^\n\r]{0,40}|\s*:?\s*\d[^\n\r]{0,40}))/i);
+  if (pack) parts.push(pack[1].trim().replace(/^[\u2022\-\*]+\s*/, "").replace(/\s+/g, " "));
+  return parts.length ? parts.join(" | ").slice(0, 200) : null;
+}
+
+// categorization has no deterministic finder yet: the DEXIS taxonomy
+// (e.g. PPE -> GLOVES -> Anticut protection) is uploaded later and the
+// template renders a placeholder until then.
+
 function extractProductData(text, documentName) {
   const safeText = text || "";
   const lines = getLines(safeText);
-  const record = createEmptyRecord(documentName || null, "deterministic-rules-v2.1");
+  const record = createEmptyRecord(documentName || null, "deterministic-rules-v2.2");
 
   setField(record, lines, safeText, "productName", findProductName(lines));
   setField(record, lines, safeText, "manufacturer", findManufacturer(safeText));
   // modelOrReference defaults to the product code line; the AI step refines it.
   setField(record, lines, safeText, "modelOrReference", findProductName(lines));
   setField(record, lines, safeText, "categoryOrIntendedUse", findCategory(safeText));
+  setField(record, lines, safeText, "description", findDescription(safeText));
   setField(record, lines, safeText, "materials", findMaterials(safeText));
   const dims = findDimensions(safeText);
   if (dims) setField(record, lines, safeText, "dimensions", dims.raw, { normalized: dims.normalized, unit: dims.unit });
   setField(record, lines, safeText, "sizesAvailable", findSizes(safeText));
+  setField(record, lines, safeText, "colors", findColors(safeText));
   setField(record, lines, safeText, "standardsAndCertifications", findStandards(safeText));
   setField(record, lines, safeText, "protectionLevelsOrPerformance", findProtectionLevels(safeText));
   setField(record, lines, safeText, "usageRestrictionsOrWarnings", findWarnings(safeText));
   setField(record, lines, safeText, "industriesOrApplications", findIndustriesOrApplications(safeText));
+  setField(record, lines, safeText, "ean", findEan(safeText));
+  setField(record, lines, safeText, "orderInfo", findOrderInfo(safeText));
 
   return record;
 }

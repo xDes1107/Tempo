@@ -1,18 +1,18 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="script.js" defer></script>
+    <script src="script.js?v=trust2" defer></script>
   <link rel="stylesheet" href="styles.css">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visual Translator</title>
+  <title>DataForge</title>
 </head>
 <body>
   <main>
-    <h1>Visual Translator</h1>
+    <h1>DataForge</h1>
 
     <p>
-      Upload a technical PDF to begin analysis.
+      Upload a supplier PDF to forge standardized company data.
     </p>
 
     <form>
@@ -31,7 +31,8 @@
 
       <button type="submit">Upload PDF</button>
     </form>
-    <section id="analysis-results" hidden>
+    <div class="triage">
+    <section id="analysis-results" class="tcol tleft" hidden>
   <h2>Candidate results</h2>
 
   <p id="analysis-summary"></p>
@@ -47,7 +48,7 @@
 
   <p id="analysis-warning"></p>
   </section>
-    <section id="watermark" hidden>
+    <section id="watermark" class="tcol tright" hidden>
   <h2>Watermark</h2>
 
   <p>Choose a corner for the company logo, then apply it to the uploaded PDF.</p>
@@ -66,14 +67,14 @@
 
   <a id="watermark-download" hidden>Download watermarked PDF</a>
   </section>
-    <section id="translation" hidden>
+    <section id="translation" class="tcol tright" hidden>
   <h2>Translation</h2>
 
   <p>Translate the extracted values. IDs, numbers, units and certification codes are never translated.</p>
 
   <div class="lang-row" role="group" aria-label="Target language">
-    <button type="button" data-lang="pt">Português</button>
-    <button type="button" data-lang="es">Español</button>
+    <button type="button" data-lang="pt">PortuguÃªs</button>
+    <button type="button" data-lang="es">EspaÃ±ol</button>
     <button type="button" data-lang="en">English</button>
   </div>
 
@@ -85,7 +86,7 @@
     <p class="dl-row"><a id="report-download" hidden>Download bilingual PDF report</a><a id="csv-download" hidden>Download translated CSV</a></p>
   </div>
   </section>
-    <section id="company-format" hidden>
+    <section id="company-format" class="tcol tleft" hidden>
   <h2>Company format</h2>
 
   <p>Download the standardized company data sheet (A4) built from the locked schema fields.</p>
@@ -101,7 +102,40 @@
 
   <p><a id="sheet-download" hidden>Download company data sheet (PDF)</a></p>
   <p><a id="sheet-json-download" hidden>Download company JSON (ERP / AI handoff)</a></p>
+  <p><a id="sheet-excel-download" hidden>Download company Excel (.xlsx)</a></p>
   </section>
+    <section id="trust" class="tcol tmid" hidden>
+  <h2>Trust Report</h2>
+  <p>Deterministic quality score (illustrative, not a probability). AI review runs only when you ask.</p>
+  <p id="trust-summary" aria-live="polite"></p>
+  <ul id="trust-list"></ul>
+  <div class="lang-row" role="group" aria-label="AI review model">
+    <select id="ai-model" aria-label="AI model for review"></select>
+    <button type="button" id="ai-review-run">Run AI review</button>
+  </div>
+  <p id="ai-review-status" aria-live="polite"></p>
+  <ul id="ai-review-list"></ul>
+  </section>
+    <section id="ai-translation-beta" class="tcol tfull" hidden>
+  <h2>AI Translation (beta)</h2>
+
+  <p>Layout-aware experiment with page vision. Does not affect company outputs.</p>
+
+  <div class="lang-row" role="group" aria-label="AI translation language">
+    <button type="button" data-ai-lang="pt">Portugues</button>
+    <button type="button" data-ai-lang="es">Espanol</button>
+    <button type="button" data-ai-lang="en">English</button>
+  </div>
+
+  <p id="ai-translation-status" aria-live="polite"></p>
+
+  <div id="ai-translation-result" hidden>
+    <img id="ai-page-image" alt="Rendered source page">
+    <p id="ai-models-line"></p>
+    <ul id="ai-blocks-list"></ul>
+  </div>
+  </section>
+    </div>
   </main>
 </body>
 </html>

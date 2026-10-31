@@ -1,18 +1,18 @@
 {
-  "artifact": "visual-translator/company-document",
-  "artifactVersion": "1.0.0-2026-10-29",
-  "generatedAt": "2026-10-29T21:54:29.848Z",
-  "companyName": "Meta",
-  "jobId": "fefe7f16-28e7-4e80-ba48-79b0109c815c",
+  "artifact": "dataforge/company-document",
+  "artifactVersion": "1.1.0-2026-10-30",
+  "generatedAt": "2026-10-30T23:21:39.590Z",
+  "companyName": "DEXIS",
+  "jobId": "sample-synthetic-1",
   "documentControl": {
     "sourceDocument": "synthetic-glove-sample.pdf",
-    "storedPdf": "data\\uploads\\fefe7f16-28e7-4e80-ba48-79b0109c815c.pdf",
-    "schemaVersion": "2.1.0-2026-10-28",
-    "extractionEngine": "deterministic-rules-v2.1",
+    "storedPdf": "data/uploads/sample-synthetic-1.pdf",
+    "schemaVersion": "2.2.0-2026-10-30",
+    "extractionEngine": "deterministic-rules-v2.2",
     "jobStatus": "completed",
-    "pageCount": null,
-    "createdAt": "2026-10-29T21:54:25.904Z",
-    "completedAt": "2026-10-29T21:54:25.963Z",
+    "pageCount": 1,
+    "createdAt": "2026-10-30T00:00:00.000Z",
+    "completedAt": "2026-10-30T00:01:00.000Z",
     "watermark": null,
     "translatedLanguages": []
   },
@@ -85,6 +85,14 @@
       "translatable": true,
       "translation": null
     },
+    "description": {
+      "value": null,
+      "originalValue": null,
+      "unit": null,
+      "evidence": [],
+      "translatable": true,
+      "translation": null
+    },
     "materials": {
       "value": null,
       "originalValue": null,
@@ -125,6 +133,14 @@
         }
       ],
       "translatable": false,
+      "translation": null
+    },
+    "colors": {
+      "value": null,
+      "originalValue": null,
+      "unit": null,
+      "evidence": [],
+      "translatable": true,
       "translation": null
     },
     "standardsAndCertifications": {
@@ -185,6 +201,30 @@
       "evidence": [],
       "translatable": true,
       "translation": null
+    },
+    "categorization": {
+      "value": null,
+      "originalValue": null,
+      "unit": null,
+      "evidence": [],
+      "translatable": false,
+      "translation": null
+    },
+    "ean": {
+      "value": null,
+      "originalValue": null,
+      "unit": null,
+      "evidence": [],
+      "translatable": false,
+      "translation": null
+    },
+    "orderInfo": {
+      "value": null,
+      "originalValue": null,
+      "unit": null,
+      "evidence": [],
+      "translatable": false,
+      "translation": null
     }
   },
   "descriptions": {
@@ -193,9 +233,9 @@
   },
   "findings": [],
   "erp": {
-    "schemaVersion": "2.1.0-2026-10-28",
+    "schemaVersion": "2.2.0-2026-10-30",
     "documentName": "synthetic-glove-sample.pdf",
-    "extractionEngine": "deterministic-rules-v2.1",
+    "extractionEngine": "deterministic-rules-v2.2",
     "productName": "KRYTECH 563",
     "productName__original": "KRYTECH 563",
     "productName__unit": "",
@@ -208,6 +248,9 @@
     "categoryOrIntendedUse": "Cut protection EN 388 Sizes 7 8 9 10 11",
     "categoryOrIntendedUse__original": "Cut protection EN 388 Sizes 7 8 9 10 11",
     "categoryOrIntendedUse__unit": "",
+    "description": "",
+    "description__original": "",
+    "description__unit": "",
     "materials": "",
     "materials__original": "",
     "materials__unit": "",
@@ -217,6 +260,9 @@
     "sizesAvailable": "7 8 9 10 11",
     "sizesAvailable__original": "7 8 9 10 11",
     "sizesAvailable__unit": "",
+    "colors": "",
+    "colors__original": "",
+    "colors__unit": "",
     "standardsAndCertifications": "EN 388",
     "standardsAndCertifications__original": "EN 388",
     "standardsAndCertifications__unit": "",
@@ -229,6 +275,15 @@
     "industriesOrApplications": "",
     "industriesOrApplications__original": "",
     "industriesOrApplications__unit": "",
+    "categorization": "",
+    "categorization__original": "",
+    "categorization__unit": "",
+    "ean": "",
+    "ean__original": "",
+    "ean__unit": "",
+    "orderInfo": "",
+    "orderInfo__original": "",
+    "orderInfo__unit": "",
     "findingsCount": 0,
     "websiteDescription": "KRYTECH 563 by MAPA SAS - Cut protection EN 388 Sizes 7 8 9 10 11. Dimensions: 23-27. Sizes: 7 8 9 10 11. Standards: EN 388. Performance: 7 8 9 10 11."
   },
@@ -242,7 +297,8 @@
       "product identifiers and model/reference codes",
       "numeric values and quantities",
       "units of measure",
-      "standards and certification codes (e.g. EN 388, ISO 13997)"
+      "standards and certification codes (e.g. EN 388, ISO 13997)",
+      "barcodes (EAN/GTIN) and order quantities"
     ]
   }
 }

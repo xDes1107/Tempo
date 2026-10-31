@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // Day 29 - canonical company JSON artifact (ERP + AI handoff).
 // buildCompanyJson(job, options) -> plain JSON-safe object.
 // One envelope around the locked-schema record, translations, website
@@ -12,8 +12,8 @@ const { buildEnrichment, buildWebsiteDescription } = require("./enrich");
 const { TARGET_LANGS } = require("./translate");
 const { readCompanyName } = require("./company-template");
 
-const ARTIFACT_TYPE = "visual-translator/company-document";
-const ARTIFACT_VERSION = "1.0.0-2026-10-29";
+const ARTIFACT_TYPE = "dataforge/company-document";
+const ARTIFACT_VERSION = "1.1.0-2026-10-30";
 
 function buildCompanyJson(job, options) {
   const opts = options || {};

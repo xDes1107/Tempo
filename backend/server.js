@@ -1,5 +1,5 @@
-"use strict";
-// Visual Translator backend - 11-field schema v2.1 + SQLite job store.
+﻿"use strict";
+// DataForge backend - 11-field schema v2.1 + SQLite job store.
 // Serves the frontend static (index.html is the entry point) and the API.
 // POST /api/documents keeps legacy candidateData so the vanilla frontend
 // keeps working; new clients use jobId + record + findings + enriched.
@@ -21,8 +21,17 @@ const { stampPdf, POSITIONS, DEFAULTS } = require("./watermark");
 const { translateRecord, TARGET_LANGS, recordWithTranslations } = require("./translate");
 const { buildBilingualReport } = require("./report");
 const { buildCompanySheet, COMPANY_NAME_DEFAULT } = require("./company-template");
+const { extractProductImage } = require("./product-image");
 const { buildCompanyJson } = require("./company-json");
-const { chatJson } = require("./meta-api");
+const { chatJson, chatVision } = require("./meta-api");
+const { renderPagePng } = require("./page-render");
+const { runAiTranslation } = require("./ai-translation");
+const { fetchSamRegions } = require("./sam-segment");
+const { buildCompanyExcel } = require("./company-excel");
+const { buildTrustReport } = require("./trust");
+const { runAiReview } = require("./ai-review");
+const { getConfig } = require("./meta-api");
+const aiTranslationsDir = nodePath.resolve(__dirname, "..", "data", "ai-translations");
 const { SqliteJobStore } = require("./job-store-sqlite");
 
 const host = "localhost";
@@ -134,7 +143,7 @@ const server = http.createServer(async function (request, response) {
   }
 
   if (request.method === "GET" && pathname === "/health") {
-    sendJson(response, 200, { status: "ok", message: "Visual Translator backend is running." });
+    sendJson(response, 200, { status: "ok", message: "DataForge backend is running." });
     return;
   }
 
@@ -219,6 +228,13 @@ const server = http.createServer(async function (request, response) {
     try {
       let logoBytes = null;
       try { logoBytes = await nodeFs.readFile(defaultLogoFile); } catch (e) { logoBytes = null; }
+      let productImageBytes = null;
+      try {
+        if (job.filePath) {
+          const srcBytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", job.filePath));
+          productImageBytes = await extractProductImage(srcBytes);
+        }
+      } catch (e) { productImageBytes = null; }
       if (wantWatermark && !logoBytes) {
         sendJson(response, 500, { error: "Logo file missing, cannot watermark the company sheet." });
         return;
@@ -228,6 +244,7 @@ const server = http.createServer(async function (request, response) {
         companyName: process.env.COMPANY_NAME || COMPANY_NAME_DEFAULT,
         jobId: id,
         logoPngBytes: logoBytes,
+        productImageBytes: productImageBytes,
         watermarkPngBytes: wantWatermark ? logoBytes : null,
         watermarkOpacity: 0.08
       });
@@ -341,6 +358,208 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
+  // AI Translation spike (beta, viewer-only, Spark vision plus optional SAM regions).
+  // POST /api/jobs/:id/ai-translation { targetLang: pt|es|en, force?: bool }
+  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/ai-translation$/.test(pathname)) {
+    const aiId = pathname.split("/").filter(Boolean)[2];
+    const aiJob = store.get(aiId);
+    if (!aiJob) {
+      sendJson(response, 404, { error: "Job not found." });
+      return;
+    }
+    let aiBody = {};
+    try {
+      aiBody = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
+    } catch (e) {
+      sendJson(response, 400, { error: "Invalid JSON body." });
+      return;
+    }
+    const aiLang = (aiBody.targetLang || "").toLowerCase();
+    if (TARGET_LANGS.indexOf(aiLang) === -1) {
+      sendJson(response, 400, { error: "Provide targetLang: " + TARGET_LANGS.join(", ") });
+      return;
+    }
+    if (!aiJob.filePath) {
+      sendJson(response, 404, { error: "Source PDF was not stored for this job. Re-upload to enable AI translation." });
+      return;
+    }
+    try {
+      await nodeFs.mkdir(aiTranslationsDir, { recursive: true });
+      const aiPng = nodePath.join(aiTranslationsDir, aiId + "-p1.png");
+      const aiCache = nodePath.join(aiTranslationsDir, aiId + "-p1-" + aiLang + ".json");
+      if (!aiBody.force) {
+        try {
+          const aiCached = JSON.parse(await nodeFs.readFile(aiCache, "utf8"));
+          sendJson(response, 200, Object.assign({ cached: true }, aiCached));
+          return;
+        } catch (e) { /* cache miss, continue */ }
+      }
+      const aiPdfAbs = nodePath.resolve(__dirname, "..", aiJob.filePath);
+      await renderPagePng(aiPdfAbs, 1, aiPng, 200);
+      const aiPngBytes = await nodeFs.readFile(aiPng);
+      let aiSourceText = "";
+      try {
+        const aiPdfBytes = await nodeFs.readFile(aiPdfAbs);
+        aiSourceText = (await extractPdfText(aiPdfBytes) || "").slice(0, 6000);
+      } catch (e) { aiSourceText = ""; }
+      const aiOut = await runAiTranslation({
+        targetLang: aiLang,
+        imageBase64: aiPngBytes.toString("base64"),
+        sourceText: aiSourceText,
+        chatVisionFn: chatVision
+      });
+      let aiSamRegions = [];
+      try { aiSamRegions = await fetchSamRegions(aiPngBytes.toString("base64")); } catch (e) { aiSamRegions = []; }
+      const aiPayload = {
+        jobId: aiId,
+        sourceFile: aiJob.fileName,
+        targetLang: aiLang,
+        page: 1,
+        imageUrl: "/api/jobs/" + aiId + "/ai-page?page=1",
+        modelTranslate: aiOut.modelTranslate,
+        modelSegment: aiOut.modelSegment,
+        samStatus: aiSamRegions.length ? "regions" : "empty-fallback-spark-only",
+        samRegions: aiSamRegions,
+        blocks: aiOut.blocks,
+        untranslatedRegions: aiOut.untranslatedRegions,
+        notes: aiOut.notes,
+        cached: false
+      };
+      await nodeFs.writeFile(aiCache, JSON.stringify(aiPayload, null, 2), "utf8");
+      sendJson(response, 200, aiPayload);
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // GET /api/jobs/:id/ai-translation?lang=pt (cached viewer JSON)
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/ai-translation$/.test(pathname)) {
+    const aiGetId = pathname.split("/").filter(Boolean)[2];
+    const aiGetLang = (parsed.searchParams.get("lang") || "").toLowerCase();
+    if (TARGET_LANGS.indexOf(aiGetLang) === -1) {
+      sendJson(response, 400, { error: "Provide ?lang=" + TARGET_LANGS.join("|") });
+      return;
+    }
+    try {
+      const aiHit = JSON.parse(await nodeFs.readFile(nodePath.join(aiTranslationsDir, aiGetId + "-p1-" + aiGetLang + ".json"), "utf8"));
+      sendJson(response, 200, Object.assign({ cached: true }, aiHit));
+    } catch (e) {
+      sendJson(response, 404, { error: "No AI translation yet. POST to /api/jobs/" + aiGetId + "/ai-translation first." });
+    }
+    return;
+  }
+
+  // GET /api/jobs/:id/ai-page?page=1 (rendered page PNG for the viewer)
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/ai-page$/.test(pathname)) {
+    const aiImgId = pathname.split("/").filter(Boolean)[2];
+    try {
+      const aiImg = await nodeFs.readFile(nodePath.join(aiTranslationsDir, aiImgId + "-p1.png"));
+      response.writeHead(200, { "Content-Type": "image/png", "Access-Control-Allow-Origin": "*" });
+      response.end(aiImg);
+    } catch (e) {
+      sendJson(response, 404, { error: "No rendered page yet. POST to /api/jobs/" + aiImgId + "/ai-translation first." });
+    }
+    return;
+  }
+
+  // Company Excel export (.xlsx): Document | Product | Findings | ERP row.
+  // Trust Report (deterministic, offline-safe). GET /api/jobs/:id/trust
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/trust$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = withEnrichment(store.get(id));
+    if (!job || !job.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    try {
+      const trust = buildTrustReport(job.record, job.findings || []);
+      sendJson(response, 200, { jobId: id, trust: trust });
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // Models available for on-demand AI review. GET /api/models
+  // Tries the live Meta endpoint when a key is configured; otherwise
+  // returns the last-known list so the dropdown always renders.
+  if (request.method === "GET" && pathname === "/api/models") {
+    const cfg = getConfig();
+    const fallback = ["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.1", "muse-wonder-1.0", "sam-3.1", "muse-spark-1.3-contributor", "muse-spark-1.2-contributor", "muse-voice-transcribe-1.0", "muse-image-1.0"];
+    if (!cfg.apiKey) {
+      sendJson(response, 200, { models: fallback, default: cfg.model, configured: false, note: "MODEL_API_KEY is not set on the server. Set it and restart to list live models." });
+      return;
+    }
+    try {
+      const res = await fetch(cfg.baseUrl + "/models", { headers: { Authorization: "Bearer " + cfg.apiKey } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const ids = (Array.isArray(data.data) ? data.data : []).map(function (m) { return m.id || m.name; }).filter(Boolean);
+      sendJson(response, 200, { models: ids.length ? ids : fallback, default: cfg.model, configured: true, baseUrl: cfg.baseUrl });
+    } catch (error) {
+      sendJson(response, 200, { models: fallback, default: cfg.model, configured: false, note: "Live list failed (" + error.message + "). Showing last-known list." });
+    }
+    return;
+  }
+
+  // On-demand AI second opinion. POST /api/jobs/:id/ai-review { model? }
+  // Deterministic trust always exists first; this is opt-in only.
+  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/ai-review$/.test(pathname)) {
+    const id = pathname.split("/").filter(Boolean)[2];
+    const job = withEnrichment(store.get(id));
+    if (!job || !job.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    let body = {};
+    try {
+      body = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
+    } catch (e) {
+      sendJson(response, 400, { error: "Invalid JSON body." });
+      return;
+    }
+    try {
+      const trust = buildTrustReport(job.record, job.findings || []);
+      const ai = await runAiReview(job.record, trust, chatJson, { model: body.model });
+      job.record.aiReview = Object.assign({}, job.record.aiReview, { lastRun: new Date().toISOString(), model: ai.rawModel, aiScore: ai.aiScore, aiFindings: ai.aiFindings, notes: ai.notes });
+      const updated = withEnrichment(store.update(id, { record: job.record }));
+      sendJson(response, 200, { jobId: id, trust: trust, ai: ai, record: updated.record });
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
+  // GET /api/jobs/:id/company-excel?lang=pt|es|en (lang optional, source when omitted)
+  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/company-excel$/.test(pathname)) {
+    const excelId = pathname.split("/").filter(Boolean)[2];
+    const excelJob = withEnrichment(store.get(excelId));
+    if (!excelJob || !excelJob.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    const excelLang = (parsed.searchParams.get("lang") || "").toLowerCase();
+    const excelUseLang = TARGET_LANGS.indexOf(excelLang) !== -1 ? excelLang : "";
+    try {
+      const excelBytes = buildCompanyExcel(excelJob, {
+        lang: excelUseLang,
+        companyName: process.env.COMPANY_NAME || COMPANY_NAME_DEFAULT,
+        jobId: excelId
+      });
+      const excelSuffix = excelUseLang ? "-" + excelUseLang : "";
+      response.writeHead(200, {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=\"" + excelId + "-company" + excelSuffix + ".xlsx\"",
+        "Access-Control-Allow-Origin": "*"
+      });
+      response.end(excelBytes);
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+
   if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/watermark$/.test(pathname)) {
     const id = pathname.split("/").filter(Boolean)[2];
     const job = store.get(id);
@@ -433,3 +652,5 @@ const server = http.createServer(async function (request, response) {
 server.listen(port, host, function () {
   console.log("Server running at http://" + host + ":" + port);
 });
+
+
