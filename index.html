@@ -1,8 +1,8 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="script.js?v=trust2" defer></script>
-  <link rel="stylesheet" href="styles.css">
+    <script src="script.js?v=stamp1" defer></script>
+  <link rel="stylesheet" href="styles.css?v=stamp1">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DataForge</title>
@@ -32,26 +32,24 @@
       <button type="submit">Upload PDF</button>
     </form>
     <div class="triage">
-    <section id="analysis-results" class="tcol tleft" hidden>
-  <h2>Candidate results</h2>
-
+    <section id="trust" class="tmain" hidden>
+  <h2>Results and Trust</h2>
+  <p>Deterministic quality score (illustrative, not a probability). Every field below shows its evidence status. AI steps run only when you ask.</p>
+  <div id="trust-summary" aria-live="polite"></div>
   <p id="analysis-summary"></p>
-
-  <h3>Product name</h3>
-  <p id="product-name"></p>
-
-  <h3>Standards</h3>
-  <ul id="standards-list"></ul>
-
-  <h3>Measurements</h3>
-  <ul id="measurements-list"></ul>
-
+  <ul id="trust-list"></ul>
   <p id="analysis-warning"></p>
+  <div class="lang-row" role="group" aria-label="AI enhancement model">
+    <select id="ai-model" aria-label="AI model for enhancement"></select>
+    <button type="button" id="ai-extract-run">Enhance with AI</button>
+  </div>
+  <p id="ai-extract-status" aria-live="polite"></p>
   </section>
-    <section id="watermark" class="tcol tright" hidden>
-  <h2>Watermark</h2>
+    <div class="band">
+    <section id="watermark" class="band-card" hidden>
+  <h2>Stamp</h2>
 
-  <p>Choose a corner for the company logo, then apply it to the uploaded PDF.</p>
+  <p>Stamp the company logo in a corner, or add the footer band across the lower section.</p>
 
   <div class="corner-grid" role="radiogroup" aria-label="Watermark position">
     <label><input type="radio" name="wm-position" value="upper-left"> Upper left</label>
@@ -61,32 +59,13 @@
     <label class="footer-row"><input type="radio" name="wm-position" value="footer"> Footer (full-width band)</label>
   </div>
 
-  <button id="watermark-apply" type="button">Apply watermark</button>
+  <button id="watermark-apply" type="button">Apply stamp</button>
 
   <p id="watermark-status" aria-live="polite"></p>
 
-  <a id="watermark-download" hidden>Download watermarked PDF</a>
+  <a id="watermark-download" hidden>Download stamped PDF</a>
   </section>
-    <section id="translation" class="tcol tright" hidden>
-  <h2>Translation</h2>
-
-  <p>Translate the extracted values. IDs, numbers, units and certification codes are never translated.</p>
-
-  <div class="lang-row" role="group" aria-label="Target language">
-    <button type="button" data-lang="pt">PortuguÃªs</button>
-    <button type="button" data-lang="es">EspaÃ±ol</button>
-    <button type="button" data-lang="en">English</button>
-  </div>
-
-  <p id="translation-status" aria-live="polite"></p>
-
-  <div id="translation-result" hidden>
-    <p id="translation-description"></p>
-    <ul id="translation-list"></ul>
-    <p class="dl-row"><a id="report-download" hidden>Download bilingual PDF report</a><a id="csv-download" hidden>Download translated CSV</a></p>
-  </div>
-  </section>
-    <section id="company-format" class="tcol tleft" hidden>
+    <section id="company-format" class="band-card" hidden>
   <h2>Company format</h2>
 
   <p>Download the standardized company data sheet (A4) built from the locked schema fields.</p>
@@ -98,43 +77,12 @@
     <button type="button" data-sheet-lang="en">English</button>
   </div>
 
-  <label><input type="checkbox" id="sheet-watermark"> Include watermark logo on the sheet</label>
+  <label><input type="checkbox" id="sheet-watermark"> Include stamp logo on the sheet</label>
 
   <p><a id="sheet-download" hidden>Download company data sheet (PDF)</a></p>
-  <p><a id="sheet-json-download" hidden>Download company JSON (ERP / AI handoff)</a></p>
-  <p><a id="sheet-excel-download" hidden>Download company Excel (.xlsx)</a></p>
+  <p><a id="sheet-excel-download" hidden>Download ERP import Excel (.xlsx)</a></p>
   </section>
-    <section id="trust" class="tcol tmid" hidden>
-  <h2>Trust Report</h2>
-  <p>Deterministic quality score (illustrative, not a probability). AI review runs only when you ask.</p>
-  <p id="trust-summary" aria-live="polite"></p>
-  <ul id="trust-list"></ul>
-  <div class="lang-row" role="group" aria-label="AI review model">
-    <select id="ai-model" aria-label="AI model for review"></select>
-    <button type="button" id="ai-review-run">Run AI review</button>
-  </div>
-  <p id="ai-review-status" aria-live="polite"></p>
-  <ul id="ai-review-list"></ul>
-  </section>
-    <section id="ai-translation-beta" class="tcol tfull" hidden>
-  <h2>AI Translation (beta)</h2>
-
-  <p>Layout-aware experiment with page vision. Does not affect company outputs.</p>
-
-  <div class="lang-row" role="group" aria-label="AI translation language">
-    <button type="button" data-ai-lang="pt">Portugues</button>
-    <button type="button" data-ai-lang="es">Espanol</button>
-    <button type="button" data-ai-lang="en">English</button>
-  </div>
-
-  <p id="ai-translation-status" aria-live="polite"></p>
-
-  <div id="ai-translation-result" hidden>
-    <img id="ai-page-image" alt="Rendered source page">
-    <p id="ai-models-line"></p>
-    <ul id="ai-blocks-list"></ul>
-  </div>
-  </section>
+    </div>
     </div>
   </main>
 </body>

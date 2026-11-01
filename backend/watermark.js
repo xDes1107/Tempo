@@ -18,7 +18,8 @@ const DEFAULTS = {
   position: "upper-right",
   margin: 36,
   footerBand: 0.12,
-  logoFile: path.resolve(__dirname, "..", "misc", "DEXIS.png")
+  logoFile: path.resolve(__dirname, "..", "misc", "DEXIS.png"),
+  footerFile: path.resolve(__dirname, "..", "misc", "Footer.jpg")
 };
 
 function layoutWatermark(pageW, pageH, imgW, imgH, opts) {
@@ -33,16 +34,20 @@ function layoutWatermark(pageW, pageH, imgW, imgH, opts) {
   else if (opts.position === "lower-left") { x = m; y = m; }
   else if (opts.position === "lower-right") { x = pageW - w - m; y = m; }
   else if (opts.position === "footer") {
-    const band = pageH * opts.footerBand;
-    let fw = pageW - 2 * m;
-    let fh = fw * (imgH / imgW);
-    if (fh > band) { fh = band; fw = fh * (imgW / imgH); }
-    return { x: (pageW - fw) / 2, y: m, width: fw, height: fh };
+    const fw = pageW;
+    const fh = fw * (imgH / imgW);
+    return { x: 0, y: 0, width: fw, height: fh };
   }
   return { x: x, y: y, width: w, height: h };
 }
 
-async function stampPdf(pdfBytes, pngBytes, options) {
+function imageKind(bytes) {
+  if (bytes && bytes.length > 3 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return "png";
+  if (bytes && bytes.length > 2 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return "jpg";
+  return "png";
+}
+
+async function stampPdf(pdfBytes, imgBytes, options) {
   let PDFDocument;
   const tried = [];
   const candidates = [
@@ -67,7 +72,9 @@ async function stampPdf(pdfBytes, pngBytes, options) {
     throw new Error("Unknown position: " + opts.position + ". Use one of: " + POSITIONS.join(", "));
   }
   const pdf = await PDFDocument.load(pdfBytes);
-  const png = await pdf.embedPng(pngBytes);
+  const bytes = new Uint8Array(imgBytes);
+  const kind = imageKind(bytes);
+  const png = kind === "jpg" ? await pdf.embedJpg(bytes) : await pdf.embedPng(bytes);
   const pages = pdf.getPages();
   pages.forEach(function (page) {
     const size = page.getSize();

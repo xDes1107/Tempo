@@ -4,7 +4,7 @@
 // POST /api/documents keeps legacy candidateData so the vanilla frontend
 // keeps working; new clients use jobId + record + findings + enriched.
 // Goal 1: GET /api/jobs/:id/export?format=json|csv (ERP/website download).
-// Goal 2: POST+GET /api/jobs/:id/watermark (corner logo stamp).
+// Goal 2: POST+GET /api/jobs/:id/watermark (corner logo stamp, footer band).
 // Uploads persist under data/uploads; watermarked PDFs under data/watermarked.
 
 const http = require("node:http");
@@ -18,20 +18,16 @@ const { validateRecord } = require("./validation");
 const { buildEnrichment } = require("./enrich");
 const { migrateRecord } = require("./schema");
 const { stampPdf, POSITIONS, DEFAULTS } = require("./watermark");
-const { translateRecord, TARGET_LANGS, recordWithTranslations } = require("./translate");
-const { buildBilingualReport } = require("./report");
+const { translateRecord, TARGET_LANGS, recordWithTranslations, recordNeedsTranslation } = require("./translate");
 const { buildCompanySheet, COMPANY_NAME_DEFAULT } = require("./company-template");
 const { extractProductImage } = require("./product-image");
 const { buildCompanyJson } = require("./company-json");
-const { chatJson, chatVision } = require("./meta-api");
-const { renderPagePng } = require("./page-render");
-const { runAiTranslation } = require("./ai-translation");
-const { fetchSamRegions } = require("./sam-segment");
+const { chatJson } = require("./meta-api");
 const { buildCompanyExcel } = require("./company-excel");
 const { buildTrustReport } = require("./trust");
 const { runAiReview } = require("./ai-review");
+const { runAiExtract } = require("./ai-extract");
 const { getConfig } = require("./meta-api");
-const aiTranslationsDir = nodePath.resolve(__dirname, "..", "data", "ai-translations");
 const { SqliteJobStore } = require("./job-store-sqlite");
 
 const host = "localhost";
@@ -40,6 +36,7 @@ const maximumFileSize = 10 * 1024 * 1024;
 const uploadsDir = nodePath.resolve(__dirname, "..", "data", "uploads");
 const watermarkedDir = nodePath.resolve(__dirname, "..", "data", "watermarked");
 const defaultLogoFile = DEFAULTS.logoFile;
+const defaultFooterFile = DEFAULTS.footerFile;
 
 const STATIC_FILES = {
   "/": { file: "index.html", type: "text/html; charset=utf-8" },
@@ -180,41 +177,12 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
-  // Goal 3 output file: bilingual PDF report for a translated job.
-  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/report$/.test(pathname)) {
-    const id = pathname.split("/").filter(Boolean)[2];
-    const job = withEnrichment(store.get(id));
-    if (!job || !job.record) {
-      sendJson(response, 404, { error: "Job or record not found." });
-      return;
-    }
-    const lang = (parsed.searchParams.get("lang") || "pt").toLowerCase();
-    const hasLang = Object.keys(job.record.fields || {}).some(function (key) {
-      const f = job.record.fields[key];
-      return f && f.value && f.translation && f.translation.lang === lang;
-    });
-    if (!hasLang) {
-      sendJson(response, 400, { error: "No " + lang + " translation yet. POST to /api/jobs/" + id + "/translate first." });
-      return;
-    }
-    try {
-      const bytes = await buildBilingualReport(job.record, job.findings || [], lang);
-      response.writeHead(200, {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": "attachment; filename=\"" + id + "-report-" + lang + ".pdf\"",
-        "Access-Control-Allow-Origin": "*"
-      });
-      response.end(bytes);
-    } catch (error) {
-      sendJson(response, 500, { error: error.message });
-    }
-    return;
-  }
-
   // Goal 3b: standardized company-format data sheet (template render).
   // GET /api/jobs/:id/company-sheet?lang=pt|es|en[&watermark=true]
-  // lang is optional (source-only sheet when omitted); missing translations
-  // render as placeholders so the sheet is always downloadable.
+  // lang is optional (source-only sheet when omitted). When a lang is asked
+  // for and slots are missing, the sheet translates them on demand first;
+  // anything still missing renders as a placeholder so the sheet is always
+  // downloadable.
   if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/company-sheet$/.test(pathname)) {
     const id = pathname.split("/").filter(Boolean)[2];
     const job = withEnrichment(store.get(id));
@@ -225,6 +193,15 @@ const server = http.createServer(async function (request, response) {
     const lang = (parsed.searchParams.get("lang") || "").toLowerCase();
     const useLang = TARGET_LANGS.indexOf(lang) !== -1 ? lang : null;
     const wantWatermark = parsed.searchParams.get("watermark") === "true";
+    if (useLang && recordNeedsTranslation(job.record, useLang)) {
+      try {
+        const autoOut = await translateRecord(job.record, useLang, chatJson, job.enriched && job.enriched.websiteDescription);
+        if (autoOut.translatedDescription) {
+          job.record.translatedDescriptions = Object.assign({}, job.record.translatedDescriptions, { [useLang]: autoOut.translatedDescription });
+        }
+        store.update(id, { record: job.record, enriched: null });
+      } catch (e) { /* fall through to placeholders */ }
+    }
     try {
       let logoBytes = null;
       try { logoBytes = await nodeFs.readFile(defaultLogoFile); } catch (e) { logoBytes = null; }
@@ -306,15 +283,15 @@ const server = http.createServer(async function (request, response) {
       sendJson(response, 400, { error: "Unknown position. Use one of: " + POSITIONS.join(", ") });
       return;
     }
-    const opacity = body.opacity == null ? 0.15 : Number(body.opacity);
+    const opacity = body.opacity == null ? (position === "footer" ? 1 : 0.15) : Number(body.opacity);
     if (!job.filePath) {
       sendJson(response, 404, { error: "Source PDF was not stored for this job (uploaded before persistence). Re-upload to enable watermarking." });
       return;
     }
     try {
       const pdfBytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", job.filePath));
-      const pngBytes = await nodeFs.readFile(body.logoFile || defaultLogoFile);
-      const out = await stampPdf(pdfBytes, pngBytes, { position: position, opacity: opacity });
+      const imgBytes = await nodeFs.readFile(body.logoFile || (position === "footer" ? defaultFooterFile : defaultLogoFile));
+      const out = await stampPdf(pdfBytes, imgBytes, { position: position, opacity: opacity });
       const wmRel = nodePath.join("data", "watermarked", id + "-" + position + ".pdf");
       await nodeFs.mkdir(watermarkedDir, { recursive: true });
       await nodeFs.writeFile(nodePath.resolve(__dirname, "..", wmRel), out);
@@ -322,143 +299,6 @@ const server = http.createServer(async function (request, response) {
       sendJson(response, 200, { jobId: id, watermarkFile: wmRel, position: position, opacity: opacity, downloadUrl: "/api/jobs/" + id + "/watermark", job: updated });
     } catch (error) {
       sendJson(response, 500, { error: error.message });
-    }
-    return;
-  }
-
-  // Goal 3: translate the validated record via the Meta Model API.
-  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/translate$/.test(pathname)) {
-    const id = pathname.split("/").filter(Boolean)[2];
-    const job = withEnrichment(store.get(id));
-    if (!job || !job.record) {
-      sendJson(response, 404, { error: "Job or record not found." });
-      return;
-    }
-    let body = {};
-    try {
-      body = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
-    } catch (e) {
-      sendJson(response, 400, { error: "Invalid JSON body." });
-      return;
-    }
-    if (!body.targetLang) {
-      sendJson(response, 400, { error: "Provide targetLang: " + TARGET_LANGS.join(", ") });
-      return;
-    }
-    try {
-      const out = await translateRecord(job.record, body.targetLang, chatJson, job.enriched && job.enriched.websiteDescription);
-      if (out.translatedDescription) {
-        job.record.translatedDescriptions = Object.assign({}, job.record.translatedDescriptions, { [body.targetLang]: out.translatedDescription });
-      }
-      const updated = withEnrichment(store.update(id, { record: job.record }));
-      sendJson(response, 200, { jobId: id, targetLang: body.targetLang, applied: out.applied, translatedDescription: out.translatedDescription, model: out.model, note: out.note || null, record: updated.record });
-    } catch (error) {
-      sendJson(response, 500, { error: error.message });
-    }
-    return;
-  }
-
-  // AI Translation spike (beta, viewer-only, Spark vision plus optional SAM regions).
-  // POST /api/jobs/:id/ai-translation { targetLang: pt|es|en, force?: bool }
-  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/ai-translation$/.test(pathname)) {
-    const aiId = pathname.split("/").filter(Boolean)[2];
-    const aiJob = store.get(aiId);
-    if (!aiJob) {
-      sendJson(response, 404, { error: "Job not found." });
-      return;
-    }
-    let aiBody = {};
-    try {
-      aiBody = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
-    } catch (e) {
-      sendJson(response, 400, { error: "Invalid JSON body." });
-      return;
-    }
-    const aiLang = (aiBody.targetLang || "").toLowerCase();
-    if (TARGET_LANGS.indexOf(aiLang) === -1) {
-      sendJson(response, 400, { error: "Provide targetLang: " + TARGET_LANGS.join(", ") });
-      return;
-    }
-    if (!aiJob.filePath) {
-      sendJson(response, 404, { error: "Source PDF was not stored for this job. Re-upload to enable AI translation." });
-      return;
-    }
-    try {
-      await nodeFs.mkdir(aiTranslationsDir, { recursive: true });
-      const aiPng = nodePath.join(aiTranslationsDir, aiId + "-p1.png");
-      const aiCache = nodePath.join(aiTranslationsDir, aiId + "-p1-" + aiLang + ".json");
-      if (!aiBody.force) {
-        try {
-          const aiCached = JSON.parse(await nodeFs.readFile(aiCache, "utf8"));
-          sendJson(response, 200, Object.assign({ cached: true }, aiCached));
-          return;
-        } catch (e) { /* cache miss, continue */ }
-      }
-      const aiPdfAbs = nodePath.resolve(__dirname, "..", aiJob.filePath);
-      await renderPagePng(aiPdfAbs, 1, aiPng, 200);
-      const aiPngBytes = await nodeFs.readFile(aiPng);
-      let aiSourceText = "";
-      try {
-        const aiPdfBytes = await nodeFs.readFile(aiPdfAbs);
-        aiSourceText = (await extractPdfText(aiPdfBytes) || "").slice(0, 6000);
-      } catch (e) { aiSourceText = ""; }
-      const aiOut = await runAiTranslation({
-        targetLang: aiLang,
-        imageBase64: aiPngBytes.toString("base64"),
-        sourceText: aiSourceText,
-        chatVisionFn: chatVision
-      });
-      let aiSamRegions = [];
-      try { aiSamRegions = await fetchSamRegions(aiPngBytes.toString("base64")); } catch (e) { aiSamRegions = []; }
-      const aiPayload = {
-        jobId: aiId,
-        sourceFile: aiJob.fileName,
-        targetLang: aiLang,
-        page: 1,
-        imageUrl: "/api/jobs/" + aiId + "/ai-page?page=1",
-        modelTranslate: aiOut.modelTranslate,
-        modelSegment: aiOut.modelSegment,
-        samStatus: aiSamRegions.length ? "regions" : "empty-fallback-spark-only",
-        samRegions: aiSamRegions,
-        blocks: aiOut.blocks,
-        untranslatedRegions: aiOut.untranslatedRegions,
-        notes: aiOut.notes,
-        cached: false
-      };
-      await nodeFs.writeFile(aiCache, JSON.stringify(aiPayload, null, 2), "utf8");
-      sendJson(response, 200, aiPayload);
-    } catch (error) {
-      sendJson(response, 500, { error: error.message });
-    }
-    return;
-  }
-
-  // GET /api/jobs/:id/ai-translation?lang=pt (cached viewer JSON)
-  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/ai-translation$/.test(pathname)) {
-    const aiGetId = pathname.split("/").filter(Boolean)[2];
-    const aiGetLang = (parsed.searchParams.get("lang") || "").toLowerCase();
-    if (TARGET_LANGS.indexOf(aiGetLang) === -1) {
-      sendJson(response, 400, { error: "Provide ?lang=" + TARGET_LANGS.join("|") });
-      return;
-    }
-    try {
-      const aiHit = JSON.parse(await nodeFs.readFile(nodePath.join(aiTranslationsDir, aiGetId + "-p1-" + aiGetLang + ".json"), "utf8"));
-      sendJson(response, 200, Object.assign({ cached: true }, aiHit));
-    } catch (e) {
-      sendJson(response, 404, { error: "No AI translation yet. POST to /api/jobs/" + aiGetId + "/ai-translation first." });
-    }
-    return;
-  }
-
-  // GET /api/jobs/:id/ai-page?page=1 (rendered page PNG for the viewer)
-  if (request.method === "GET" && /^\/api\/jobs\/[^/]+\/ai-page$/.test(pathname)) {
-    const aiImgId = pathname.split("/").filter(Boolean)[2];
-    try {
-      const aiImg = await nodeFs.readFile(nodePath.join(aiTranslationsDir, aiImgId + "-p1.png"));
-      response.writeHead(200, { "Content-Type": "image/png", "Access-Control-Allow-Origin": "*" });
-      response.end(aiImg);
-    } catch (e) {
-      sendJson(response, 404, { error: "No rendered page yet. POST to /api/jobs/" + aiImgId + "/ai-translation first." });
     }
     return;
   }
@@ -503,8 +343,49 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
-  // On-demand AI second opinion. POST /api/jobs/:id/ai-review { model? }
-  // Deterministic trust always exists first; this is opt-in only.
+  // Opt-in AI enhancement over deterministic extraction.
+  // POST /api/jobs/:id/ai-extract { model? }
+  // The deterministic record always exists first; the model fills missing
+  // fields and may correct known misfire fields. Unevidenced values are
+  // dropped on merge, then findings and trust are recomputed.
+  if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/ai-extract$/.test(pathname)) {
+    const aiExtractId = pathname.split("/").filter(Boolean)[2];
+    const aiExtractJob = withEnrichment(store.get(aiExtractId));
+    if (!aiExtractJob || !aiExtractJob.record) {
+      sendJson(response, 404, { error: "Job or record not found." });
+      return;
+    }
+    let aiExtractBody = {};
+    try {
+      aiExtractBody = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}");
+    } catch (e) {
+      sendJson(response, 400, { error: "Invalid JSON body." });
+      return;
+    }
+    try {
+      const aiRel = aiExtractJob.filePath || nodePath.join("data", "uploads", aiExtractId + ".pdf");
+      const aiPdfBytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", aiRel));
+      const aiSourceText = await extractPdfText(aiPdfBytes);
+      if (!aiSourceText || !aiSourceText.trim()) {
+        sendJson(response, 400, { error: "No extractable text in this PDF, nothing for AI to enhance." });
+        return;
+      }
+      migrateRecord(aiExtractJob.record);
+      const aiResult = await runAiExtract(aiExtractJob.record, aiSourceText, chatJson, { model: aiExtractBody.model });
+      const aiFindings = validateRecord(aiExtractJob.record);
+      const aiTrust = buildTrustReport(aiExtractJob.record, aiFindings);
+      const aiUpdated = withEnrichment(store.update(aiExtractId, { record: aiExtractJob.record, findings: aiFindings, enriched: null }));
+      sendJson(response, 200, { jobId: aiExtractId, trust: aiTrust, ai: aiResult, record: aiUpdated.record, findings: aiFindings });
+    } catch (error) {
+      sendJson(response, 500, { error: error.message });
+    }
+    return;
+  }
+  // On-demand AI review that also fixes what it flags.
+  // POST /api/jobs/:id/ai-review { model? }
+  // Deterministic trust always exists first; this is opt-in only. Evidenced
+  // corrections are merged into the record, then findings and trust are
+  // recomputed so the review visibly enhances the file output.
   if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/ai-review$/.test(pathname)) {
     const id = pathname.split("/").filter(Boolean)[2];
     const job = withEnrichment(store.get(id));
@@ -520,11 +401,20 @@ const server = http.createServer(async function (request, response) {
       return;
     }
     try {
-      const trust = buildTrustReport(job.record, job.findings || []);
-      const ai = await runAiReview(job.record, trust, chatJson, { model: body.model });
-      job.record.aiReview = Object.assign({}, job.record.aiReview, { lastRun: new Date().toISOString(), model: ai.rawModel, aiScore: ai.aiScore, aiFindings: ai.aiFindings, notes: ai.notes });
-      const updated = withEnrichment(store.update(id, { record: job.record }));
-      sendJson(response, 200, { jobId: id, trust: trust, ai: ai, record: updated.record });
+      migrateRecord(job.record);
+      let reviewSourceText = "";
+      try {
+        const reviewRel = job.filePath || nodePath.join("data", "uploads", id + ".pdf");
+        const reviewBytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", reviewRel));
+        reviewSourceText = await extractPdfText(reviewBytes);
+      } catch (e) { reviewSourceText = ""; }
+      const preTrust = buildTrustReport(job.record, job.findings || []);
+      const ai = await runAiReview(job.record, preTrust, chatJson, { model: body.model, sourceText: reviewSourceText });
+      job.record.aiReview = Object.assign({}, job.record.aiReview, { lastRun: new Date().toISOString(), model: ai.rawModel, aiScore: ai.aiScore, aiFindings: ai.aiFindings, notes: ai.notes, appliedCorrections: ai.applied, skippedCorrections: ai.skipped });
+      const aiReviewFindings = validateRecord(job.record);
+      const aiReviewTrust = buildTrustReport(job.record, aiReviewFindings);
+      const updated = withEnrichment(store.update(id, { record: job.record, findings: aiReviewFindings, enriched: null }));
+      sendJson(response, 200, { jobId: id, trust: aiReviewTrust, ai: ai, record: updated.record, findings: aiReviewFindings });
     } catch (error) {
       sendJson(response, 500, { error: error.message });
     }
@@ -541,6 +431,15 @@ const server = http.createServer(async function (request, response) {
     }
     const excelLang = (parsed.searchParams.get("lang") || "").toLowerCase();
     const excelUseLang = TARGET_LANGS.indexOf(excelLang) !== -1 ? excelLang : "";
+    if (excelUseLang && recordNeedsTranslation(excelJob.record, excelUseLang)) {
+      try {
+        const excelOut = await translateRecord(excelJob.record, excelUseLang, chatJson, excelJob.enriched && excelJob.enriched.websiteDescription);
+        if (excelOut.translatedDescription) {
+          excelJob.record.translatedDescriptions = Object.assign({}, excelJob.record.translatedDescriptions, { [excelUseLang]: excelOut.translatedDescription });
+        }
+        store.update(excelId, { record: excelJob.record, enriched: null });
+      } catch (e) { /* fall through to source values */ }
+    }
     try {
       const excelBytes = buildCompanyExcel(excelJob, {
         lang: excelUseLang,
@@ -550,7 +449,7 @@ const server = http.createServer(async function (request, response) {
       const excelSuffix = excelUseLang ? "-" + excelUseLang : "";
       response.writeHead(200, {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": "attachment; filename=\"" + excelId + "-company" + excelSuffix + ".xlsx\"",
+        "Content-Disposition": "attachment; filename=\"" + excelId + "-erp-import" + excelSuffix + ".xlsx\"",
         "Access-Control-Allow-Origin": "*"
       });
       response.end(excelBytes);
@@ -564,19 +463,19 @@ const server = http.createServer(async function (request, response) {
     const id = pathname.split("/").filter(Boolean)[2];
     const job = store.get(id);
     if (!job || !job.watermarkFile) {
-      sendJson(response, 404, { error: "No watermark yet. POST to /api/jobs/" + (id || ":id") + "/watermark first." });
+      sendJson(response, 404, { error: "No stamp yet. POST to /api/jobs/" + (id || ":id") + "/watermark first." });
       return;
     }
     try {
       const bytes = await nodeFs.readFile(nodePath.resolve(__dirname, "..", job.watermarkFile));
       response.writeHead(200, {
         "Content-Type": "application/pdf",
-        "Content-Disposition": "attachment; filename=\"" + id + "-watermarked.pdf\"",
+        "Content-Disposition": "attachment; filename=\"" + id + "-stamped.pdf\"",
         "Access-Control-Allow-Origin": "*"
       });
       response.end(bytes);
     } catch (e) {
-      sendJson(response, 404, { error: "Watermark file missing on disk." });
+      sendJson(response, 404, { error: "Stamp file missing on disk." });
     }
     return;
   }

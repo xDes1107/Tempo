@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 // Goal 3 translation - simple first step (Oct 28).
 // Translates the validated record via the Meta Model API (same adapter as
 // extraction). No OCR and no AI extraction here: the input is the existing
@@ -91,6 +91,21 @@ async function translateRecord(record, targetLang, chatJson, websiteDescription)
   return { applied: applied, translatedDescription: translatedDescription, model: (res && res.model) || null };
 }
 
+function recordNeedsTranslation(record, lang) {
+  if (!record || !record.fields) return false;
+  const missing = Object.keys(record.fields).some(function (key) {
+    const def = fieldDef(key);
+    const f = record.fields[key];
+    return Boolean(def && def.translatable && f && f.value && (!f.translation || f.translation.lang !== lang || !f.translation.translatedValue));
+  });
+  if (missing) return true;
+  const desc = buildWebsiteDescription(record);
+  if (desc && desc.trim()) {
+    const cached = (record.translatedDescriptions || {})[lang];
+    if (!cached) return true;
+  }
+  return false;
+}
 module.exports = {
   TARGET_LANGS: TARGET_LANGS,
   LANG_NAMES: LANG_NAMES,
@@ -98,5 +113,6 @@ module.exports = {
   buildTranslatePrompt: buildTranslatePrompt,
   applyTranslations: applyTranslations,
   translateRecord: translateRecord,
-  recordWithTranslations: recordWithTranslations
+  recordWithTranslations: recordWithTranslations,
+  recordNeedsTranslation: recordNeedsTranslation
 };

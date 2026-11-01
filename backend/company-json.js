@@ -10,7 +10,7 @@
 const { migrateRecord, SCHEMA_VERSION, FIELD_KEYS, DO_NOT_TRANSLATE } = require("./schema");
 const { buildEnrichment, buildWebsiteDescription } = require("./enrich");
 const { TARGET_LANGS } = require("./translate");
-const { readCompanyName } = require("./company-template");
+const { readCompanyName, buildRecommendation } = require("./company-template");
 
 const ARTIFACT_TYPE = "dataforge/company-document";
 const ARTIFACT_VERSION = "1.1.0-2026-10-30";
@@ -52,6 +52,7 @@ function buildCompanyJson(job, options) {
       source: enriched.websiteDescription || buildWebsiteDescription(record),
       translated: translated
     },
+    recommendation: buildRecommendation(record.fields, null),
     findings: findings,
     erp: enriched.erpRow,
     translationPolicy: {

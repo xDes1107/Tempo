@@ -2,44 +2,24 @@
 const fileInput = document.querySelector("#pdf-file");
 const fileStatus = document.querySelector("#file-status");
 const uploadButton = document.querySelector("button");
-const analysisResults = document.querySelector("#analysis-results");
+const analysisResults = document.querySelector("#trust");
 const analysisSummary = document.querySelector("#analysis-summary");
-const productName = document.querySelector("#product-name");
-const standardsList = document.querySelector("#standards-list");
-const measurementsList = document.querySelector("#measurements-list");
 const analysisWarning = document.querySelector("#analysis-warning");
 const watermarkSection = document.querySelector("#watermark");
 const watermarkApply = document.querySelector("#watermark-apply");
 const watermarkStatus = document.querySelector("#watermark-status");
 const watermarkDownload = document.querySelector("#watermark-download");
-const translationSection = document.querySelector("#translation");
-const translationStatus = document.querySelector("#translation-status");
-const translationResult = document.querySelector("#translation-result");
-const translationDescription = document.querySelector("#translation-description");
-const translationList = document.querySelector("#translation-list");
-const reportDownload = document.querySelector("#report-download");
-const csvDownload = document.querySelector("#csv-download");
 const companyFormat = document.querySelector("#company-format");
 const sheetDownload = document.querySelector("#sheet-download");
 const sheetWatermark = document.querySelector("#sheet-watermark");
-const sheetJsonDownload = document.querySelector("#sheet-json-download");
 const sheetExcelDownload = document.querySelector("#sheet-excel-download");
-const aiSection = document.querySelector("#ai-translation-beta");
-const aiStatus = document.querySelector("#ai-translation-status");
-const aiResult = document.querySelector("#ai-translation-result");
-const aiPageImage = document.querySelector("#ai-page-image");
-const aiModelsLine = document.querySelector("#ai-models-line");
-const aiBlocksList = document.querySelector("#ai-blocks-list");
 const trustSection = document.querySelector("#trust");
 const trustSummary = document.querySelector("#trust-summary");
 const trustList = document.querySelector("#trust-list");
 const aiModelSelect = document.querySelector("#ai-model");
-const aiReviewRun = document.querySelector("#ai-review-run");
-const aiReviewStatus = document.querySelector("#ai-review-status");
-const aiReviewList = document.querySelector("#ai-review-list");
 let sheetLang = "";
+let lastTrust = null;
 
-let currentLang = null;
 
 let currentJobId = null;
 let currentRecord = null;
@@ -56,18 +36,9 @@ fileInput.addEventListener("change", function () {
   watermarkStatus.textContent = "";
   currentJobId = null;
   currentRecord = null;
-  translationSection.hidden = true;
   companyFormat.hidden = true;
-  aiSection.hidden = true;
-  aiResult.hidden = true;
-  aiStatus.textContent = "";
   sheetDownload.hidden = true;
-  sheetJsonDownload.hidden = true;
   sheetExcelDownload.hidden = true;
-  translationResult.hidden = true;
-  reportDownload.hidden = true;
-  csvDownload.hidden = true;
-  translationStatus.textContent = "";
 
   if (!selectedFile) {
     fileStatus.textContent = "No file selected.";
@@ -102,37 +73,15 @@ function renderList(listElement, values, emptyMessage) {
 
 function showCandidateResults(result) {
   const candidateData = result.candidateData;
-  const name = candidateData.product.name;
 
   analysisResults.hidden = false;
 
   analysisSummary.textContent =
     `${result.document.textCharacterCount} characters extracted ` +
-    `using ${candidateData.extractionMethod}.`;
-
-  productName.textContent = name
-    ? name.value
-    : "No candidate product name found.";
-
-  renderList(
-    standardsList,
-    candidateData.standards.map(function (standard) {
-      return standard.value;
-    }),
-    "No standards found."
-  );
-
-  renderList(
-    measurementsList,
-    candidateData.unclassifiedMeasurements.map(function (measurement) {
-      return measurement.originalValue;
-    }),
-    "No measurements found."
-  );
+    `using ${candidateData.extractionMethod}. See the Trust list for every field and its evidence status.`;
 
   analysisWarning.textContent = candidateData.warnings.join(" ");
 }
-
 form.addEventListener("submit", async function (event) {
   event.preventDefault();
 
@@ -167,18 +116,12 @@ form.addEventListener("submit", async function (event) {
 
     currentJobId = result.jobId;
     currentRecord = result.record;
-    translationSection.hidden = false;
     companyFormat.hidden = false;
-    aiSection.hidden = false;
     if (trustSection) { trustSection.hidden = false; }
     loadTrust();
     loadModels();
     sheetLang = "";
     updateSheetLink();
-    translationResult.hidden = true;
-  reportDownload.hidden = true;
-  csvDownload.hidden = true;
-    translationStatus.textContent = "";
     watermarkSection.hidden = false;
     watermarkStatus.textContent = "";
     watermarkDownload.hidden = true;
@@ -202,7 +145,7 @@ watermarkApply.addEventListener("click", async function () {
   const position = checked ? checked.value : "upper-right";
 
   watermarkApply.disabled = true;
-  watermarkStatus.textContent = "Applying watermark (" + position + ")...";
+  watermarkStatus.textContent = "Applying stamp (" + position + ")...";
   watermarkDownload.hidden = true;
 
   try {
@@ -215,124 +158,24 @@ watermarkApply.addEventListener("click", async function () {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || "Watermark failed.");
+      throw new Error(result.error || "Stamp failed.");
     }
 
-    watermarkStatus.textContent = "Watermark applied (" + result.position + ").";
+    watermarkStatus.textContent = "Stamp applied (" + result.position + ").";
     watermarkDownload.href = result.downloadUrl;
     watermarkDownload.hidden = false;
   } catch (error) {
-    watermarkStatus.textContent = "Watermark failed: " + error.message;
+    watermarkStatus.textContent = "Stamp failed: " + error.message;
   } finally {
     watermarkApply.disabled = false;
   }
 });
 
-const FIELD_LABELS = {
-  productName: "Product name",
-  manufacturer: "Manufacturer",
-  modelOrReference: "Model / reference",
-  categoryOrIntendedUse: "Category / intended use",
-  materials: "Materials",
-  dimensions: "Dimensions",
-  sizesAvailable: "Sizes available",
-  standardsAndCertifications: "Standards / certifications",
-  protectionLevelsOrPerformance: "Protection levels / performance",
-  usageRestrictionsOrWarnings: "Usage restrictions / warnings",
-  industriesOrApplications: "Industries / applications"
-};
-
-const LANG_NAMES = { pt: "Portuguese", es: "Spanish", en: "English" };
-
-function recordHasLang(record, lang) {
-  if (!record || !record.fields) return false;
-  const keys = Object.keys(FIELD_LABELS);
-  for (let i = 0; i < keys.length; i++) {
-    const f = record.fields[keys[i]];
-    if (f && f.value) {
-      if (!f.translation || f.translation.lang !== lang) return false;
-    }
-  }
-  return true;
-}
-
-function renderTranslation(record, lang, description) {
-  translationList.replaceChildren();
-
-  Object.keys(FIELD_LABELS).forEach(function (key) {
-    const f = record.fields[key];
-    if (!f || !f.value) return;
-    const item = document.createElement("li");
-    const t = (f.translation && f.translation.lang === lang)
-      ? f.translation.translatedValue
-      : "â€”";
-    item.textContent = FIELD_LABELS[key] + ": " + f.value + " â†’ " + t;
-    translationList.append(item);
-  });
-
-  translationDescription.textContent = description || "";
-  reportDownload.href = "/api/jobs/" + currentJobId + "/report?lang=" + lang;
-  reportDownload.hidden = false;
-  csvDownload.href = "/api/jobs/" + currentJobId + "/export?format=csv&lang=" + lang;
-  csvDownload.hidden = false;
-  currentLang = lang;
-  translationResult.hidden = false;
-}
-
-async function requestTranslation(lang) {
-  if (!currentJobId || !currentRecord) {
-    translationStatus.textContent = "Upload a PDF first.";
-    return;
-  }
-
-  const cachedDesc = (currentRecord.translatedDescriptions || {})[lang] || null;
-
-  if (recordHasLang(currentRecord, lang)) {
-    renderTranslation(currentRecord, lang, cachedDesc);
-    translationStatus.textContent = "Showing saved " + LANG_NAMES[lang] + " translation.";
-    return;
-  }
-
-  translationResult.hidden = true;
-  reportDownload.hidden = true;
-  csvDownload.hidden = true;
-  translationStatus.textContent = "Translating to " + LANG_NAMES[lang] + "...";
-
-  try {
-    const response = await fetch("/api/jobs/" + currentJobId + "/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetLang: lang })
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.error || "Translation failed.");
-    }
-
-    currentRecord = result.record;
-    renderTranslation(currentRecord, lang, result.translatedDescription);
-
-    translationStatus.textContent = result.note
-      ? result.note
-      : "Translated " + result.applied.length + " fields" + (result.model ? " with " + result.model : "") + ".";
-  } catch (error) {
-    translationStatus.textContent = "Translation failed: " + error.message;
-  }
-}
-
-document.querySelectorAll("#translation [data-lang]").forEach(function (button) {
-  button.addEventListener("click", function () {
-    requestTranslation(button.getAttribute("data-lang"));
-  });
-});
 
 // Company-format sheet (Goal 3b template render).
 function updateSheetLink() {
   if (!currentJobId) {
     sheetDownload.hidden = true;
-    sheetJsonDownload.hidden = true;
   sheetExcelDownload.hidden = true;
     return;
   }
@@ -343,10 +186,8 @@ function updateSheetLink() {
   if (q.length) url += "?" + q.join("&");
   sheetDownload.href = url;
   sheetDownload.hidden = false;
-  sheetJsonDownload.href = "/api/jobs/" + currentJobId + "/company-json";
   sheetExcelDownload.href = "/api/jobs/" + currentJobId + "/company-excel" + (sheetLang ? "?lang=" + sheetLang : "");
   sheetExcelDownload.hidden = false;
-  sheetJsonDownload.hidden = false;
 }
 
 document.querySelectorAll("#company-format [data-sheet-lang]").forEach(function (button) {
@@ -360,47 +201,6 @@ sheetWatermark.addEventListener("change", updateSheetLink);
 
 
 
-async function requestAiTranslation(lang) {
-  if (!currentJobId) {
-    aiStatus.textContent = "Upload a PDF first.";
-    return;
-  }
-  aiResult.hidden = true;
-  aiStatus.textContent = "Analyzing page 1 with page vision...";
-  try {
-    const response = await fetch("/api/jobs/" + currentJobId + "/ai-translation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetLang: lang })
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || "AI translation failed.");
-    }
-    renderAiBlocks(result);
-    aiStatus.textContent = "Page 1: " + result.blocks.length + " blocks" + (result.cached ? " (cached)." : " (" + result.modelTranslate + ", SAM: " + result.samStatus + ").");
-  } catch (error) {
-    aiStatus.textContent = "AI translation failed: " + error.message;
-  }
-}
-
-function renderAiBlocks(payload) {
-  aiBlocksList.replaceChildren();
-  aiPageImage.src = payload.imageUrl;
-  aiModelsLine.textContent = "Translate: " + payload.modelTranslate + " | Segment: " + payload.samStatus;
-  (payload.blocks || []).forEach(function (b) {
-    const item = document.createElement("li");
-    item.textContent = "[" + b.blockType + " " + b.confidence + "] " + b.sourceText + " -> " + b.translatedText + (b.warning ? " (! " + b.warning + ")" : "");
-    aiBlocksList.append(item);
-  });
-  aiResult.hidden = false;
-}
-
-document.querySelectorAll("#ai-translation-beta [data-ai-lang]").forEach(function (button) {
-  button.addEventListener("click", function () {
-    requestAiTranslation(button.getAttribute("data-ai-lang"));
-  });
-});
 
 
 
@@ -417,16 +217,74 @@ async function loadTrust() {
   }
 }
 
+function trustGroup(status) {
+  if (status === "supported") return "ok";
+  if (status === "missing-required" || status === "missing-optional") return "missing";
+  return "review";
+}
+
+function trustDelta(pre, post) {
+  if (!pre || !post || !pre.counts || !post.counts) return "";
+  const ds = post.score - pre.score;
+  const okD = (post.counts.supported || 0) - (pre.counts.supported || 0);
+  return " Trust " + pre.score + "% -> " + post.score + "% (" + (okD >= 0 ? "+" : "") + okD + " ok).";
+}
+
 function renderTrust(trust) {
   if (!trust) return;
+  lastTrust = trust;
   const c = trust.counts || {};
-  trustSummary.textContent = "Score " + trust.score + "% - " + (c.extracted || 0) + " fields extracted, " + (c.supported || 0) + " source-supported, " + (c.missing || 0) + " missing, " + (c.review || 0) + " requiring review.";
+  const total = c.total || 0;
+  const ok = c.supported || 0;
+  const review = c.review || 0;
+  const missing = Math.max(0, total - (c.extracted || 0));
+  trustSummary.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "trust-head";
+  const r = 36;
+  const circ = 2 * Math.PI * r;
+  function seg(value, cls, offset) {
+    const len = total ? (value / total) * circ : 0;
+    return "<circle cx=\"46\" cy=\"46\" r=\"" + r + "\" class=\"seg " + cls + "\" stroke-dasharray=\"" + len.toFixed(1) + " " + circ.toFixed(1) + "\" stroke-dashoffset=\"" + (-offset).toFixed(1) + "\" transform=\"rotate(-90 46 46)\"/>";
+  }
+  let acc = 0;
+  const okSeg = seg(ok, "ok", acc); acc += total ? (ok / total) * circ : 0;
+  const revSeg = seg(review, "review", acc); acc += total ? (review / total) * circ : 0;
+  const missSeg = seg(missing, "missing", acc);
+  head.innerHTML = "<svg class=\"donut\" width=\"92\" height=\"92\" viewBox=\"0 0 92 92\" role=\"img\" aria-label=\"Trust score " + trust.score + " percent\">" +
+    "<circle cx=\"46\" cy=\"46\" r=\"" + r + "\" class=\"track\"/>" + okSeg + revSeg + missSeg +
+    "<text x=\"46\" y=\"52\" text-anchor=\"middle\" class=\"donut-score\">" + trust.score + "%</text></svg>" +
+    "<div class=\"trust-stats\"><div class=\"tstat\"><strong>" + total + "</strong><span>fields total</span></div>" +
+    "<div class=\"tstat\"><strong>" + (c.extracted || 0) + "</strong><span>extracted</span></div>" +
+    "<div class=\"tstat\"><strong>" + ok + "</strong><span>ok</span></div>" +
+    "<div class=\"tstat\"><strong>" + review + "</strong><span>need review</span></div>" +
+    "<div class=\"tstat\"><strong>" + missing + "</strong><span>missing</span></div></div>";
+  trustSummary.append(head);
   trustList.replaceChildren();
-  (trust.fields || []).forEach(function (f) {
+  const rank = { ok: 0, review: 1, missing: 2 };
+  const rows = (trust.fields || []).slice().sort(function (a, b) {
+    const d = rank[trustGroup(a.status)] - rank[trustGroup(b.status)];
+    if (d !== 0) return d;
+    return a.label < b.label ? -1 : 1;
+  });
+  rows.forEach(function (f) {
+    const g = trustGroup(f.status);
     const item = document.createElement("li");
-    let extra = "[" + f.status + "] " + f.label + ": " + (f.hasValue ? f.value : "missing");
-    if (f.page) extra += " (p. " + f.page + ")";
-    item.textContent = extra;
+    item.className = "trust-row " + g;
+    const dot = document.createElement("span");
+    dot.className = "dot " + g;
+    const body = document.createElement("div");
+    body.className = "trust-body";
+    const label = document.createElement("div");
+    label.className = "tlabel";
+    label.textContent = f.label;
+    const val = document.createElement("div");
+    val.className = "tval";
+    val.textContent = f.hasValue ? f.value + (f.page ? "  (p. " + f.page + ")" : "") : "missing";
+    body.append(label);
+    body.append(val);
+    item.append(dot);
+    item.append(body);
     trustList.append(item);
   });
 }
@@ -444,47 +302,58 @@ async function loadModels() {
       if (id === result.default) opt.selected = true;
       aiModelSelect.append(opt);
     });
-    if (aiReviewStatus && result.configured === false) {
-      aiReviewStatus.textContent = "Deterministic trust above is final until you run an AI review. " + (result.note || "");
+    if (aiExtractStatus && result.configured === false) {
+      aiExtractStatus.textContent = "Deterministic trust above is final until you enhance with AI. " + (result.note || "");
     }
   } catch (error) {
-    if (aiReviewStatus) aiReviewStatus.textContent = "Model list unavailable: " + error.message;
+    if (aiExtractStatus) aiExtractStatus.textContent = "Model list unavailable: " + error.message;
   }
 }
 
-async function runAiReviewNow() {
+const aiExtractRun = document.querySelector("#ai-extract-run");
+const aiExtractStatus = document.querySelector("#ai-extract-status");
+
+function renderAiExtractedRecord(record) {
+  if (!record) return;
+  analysisSummary.textContent =
+    "Enhanced by " + (record.extractionEngine || "AI") + ". See the Trust list for every field and its evidence status.";
+}
+async function runAiExtractNow() {
   if (!currentJobId) {
-    if (aiReviewStatus) aiReviewStatus.textContent = "Upload a PDF first.";
+    if (aiExtractStatus) aiExtractStatus.textContent = "Upload a PDF first.";
     return;
   }
-  if (aiReviewStatus) aiReviewStatus.textContent = "Running AI review...";
-  if (aiReviewList) aiReviewList.replaceChildren();
+  const preEnhanceTrust = lastTrust;
+  if (aiExtractStatus) aiExtractStatus.textContent = "Running AI enhancement...";
   try {
-    const response = await fetch("/api/jobs/" + currentJobId + "/ai-review", {
+    const response = await fetch("/api/jobs/" + currentJobId + "/ai-extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: aiModelSelect ? aiModelSelect.value : undefined })
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "AI review failed.");
-    if (result.trust) renderTrust(result.trust);
+    if (!response.ok) throw new Error(result.error || "AI enhancement failed.");
     const ai = result.ai || {};
-    if (aiReviewStatus) aiReviewStatus.textContent = "AI score " + (ai.aiScore == null ? "-" : ai.aiScore + "%") + " via " + (ai.rawModel || ai.model || "model") + (ai.notes ? " - " + ai.notes : "");
-    (ai.aiFindings || []).forEach(function (f) {
-      const item = document.createElement("li");
-      item.textContent = "[" + f.severity + "] " + f.code + (f.field ? " (" + f.field + ")" : "") + ": " + f.message;
-      aiReviewList.append(item);
-    });
-    if (!(ai.aiFindings || []).length && aiReviewList) {
-      const item = document.createElement("li");
-      item.textContent = "No extra AI findings.";
-      aiReviewList.append(item);
+    currentRecord = result.record || currentRecord;
+    renderAiExtractedRecord(currentRecord);
+    if (result.trust) renderTrust(result.trust);
+    const applied = ai.applied || [];
+    const skipped = ai.skipped || [];
+    if (aiExtractStatus) {
+      if (ai.note) {
+        aiExtractStatus.textContent = ai.note;
+      } else if (!applied.length) {
+        aiExtractStatus.textContent = "AI found nothing new to add (" + skipped.length + " skipped). Deterministic results stand.";
+      } else {
+        const names = applied.map(function (a) { return a.key + " (" + a.kind + ")"; }).join(", ");
+        aiExtractStatus.textContent = "AI enhanced " + applied.length + " field(s) via " + (ai.model || "model") + ": " + names + "." + trustDelta(preEnhanceTrust, result.trust);
+      }
     }
   } catch (error) {
-    if (aiReviewStatus) aiReviewStatus.textContent = "AI review failed: " + error.message;
+    if (aiExtractStatus) aiExtractStatus.textContent = "AI enhancement failed: " + error.message;
   }
 }
 
-if (typeof aiReviewRun !== "undefined" && aiReviewRun) {
-  aiReviewRun.addEventListener("click", runAiReviewNow);
+if (typeof aiExtractRun !== "undefined" && aiExtractRun) {
+  aiExtractRun.addEventListener("click", runAiExtractNow);
 }

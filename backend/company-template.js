@@ -10,6 +10,7 @@
 // Schema v2.2 fields feed the sheet: manufacturer, description, norms
 // (= standardsAndCertifications), sizes + colors (only if applicable),
 // categorization (taxonomy path, placeholder until the taxonomy upload),
+// recommendation (Recommended usage sentence per misc/Recommend.txt),
 // ean + orderInfo (only if found). All other valued fields render in
 // Specifications; empty fields are skipped (sheet is always downloadable).
 //
@@ -27,7 +28,7 @@ const path = require("node:path");
 const { FIELD_KEYS, fieldDef } = require("./schema");
 const { LANG_NAMES } = require("./translate");
 const { buildWebsiteDescription } = require("./enrich");
-const { sanitize, wrapText } = require("./report");
+const { sanitize, wrapText } = require("./pdf-text");
 
 const COMPANY_NAME_DEFAULT = "DEXIS";
 const PAGE_W = 595;
@@ -88,9 +89,58 @@ function translatedText(f, lang) {
   return "(not translated)";
 }
 
+// Recommended usage (misc/Recommend.txt template): "This [Product] is made by
+// [Manufacturer]. It is a [Type of product] [Product Type i.e. Glove, Helmet],
+// recommended to be used for [Area] and/or [Area]. It is certified to the
+// following [Norms]." Product -> Type -> Area -> Norms, built only from
+// extracted technical-sheet values, kept simple, missing parts skipped.
+var PRODUCT_NOUNS = ["glove", "helmet", "goggle", "glass", "mask", "respirator", "boot", "shoe", "apron", "sleeve", "jacket", "coverall", "earmuff"];
+
+function guessProductNoun(fields) {
+  const hay = ["productName", "modelOrReference", "categoryOrIntendedUse", "description"].map(function (k) {
+    const f = fields ? fields[k] : null;
+    return f && f.value ? String(f.value) : "";
+  }).join(" ").toLowerCase();
+  for (let i = 0; i < PRODUCT_NOUNS.length; i++) {
+    const n = PRODUCT_NOUNS[i];
+    if (hay.indexOf(n) !== -1 || hay.indexOf(n + "s") !== -1) return n;
+  }
+  return null;
+}
+
 function labelOf(key) {
   const def = fieldDef(key);
   return def ? def.label : key;
+}
+
+function buildRecommendation(fields, lang) {
+  function pick(key) {
+    const f = fields ? fields[key] : null;
+    if (!f || !f.value) return null;
+    if (lang && f.translation && f.translation.lang === lang && f.translation.translatedValue) {
+      return f.translation.translatedValue;
+    }
+    return f.unit ? f.value + " [" + f.unit + "]" : f.value;
+  }
+  const product = pick("productName") || pick("modelOrReference");
+  const maker = pick("manufacturer");
+  const type = pick("categoryOrIntendedUse") || pick("protectionLevelsOrPerformance");
+  const noun = guessProductNoun(fields);
+  const areaRaw = pick("industriesOrApplications");
+  const norms = pick("standardsAndCertifications");
+  const areas = areaRaw ? areaRaw.split(/[,;/]+/).map(function (a) { return a.trim(); }).filter(Boolean) : [];
+  const kind = [type, noun].filter(Boolean).join(" ");
+  const sentences = [];
+  if (product && maker) sentences.push("This " + product + " is made by " + maker + ".");
+  else if (product) sentences.push("This " + product + ".");
+  const article = kind && /^[aeiou]/i.test(kind.trim()) ? "an" : "a";
+  if (kind && areas.length > 1) sentences.push("It is " + article + " " + kind + ", recommended to be used for " + areas[0] + " and/or " + areas.slice(1).join(", ") + ".");
+  else if (kind && areas.length === 1) sentences.push("It is " + article + " " + kind + ", recommended to be used for " + areas[0] + ".");
+  else if (kind) sentences.push("It is " + article + " " + kind + ".");
+  else if (areas.length) sentences.push("Recommended to be used for " + areas.join(" and/or ") + ".");
+  if (norms) sentences.push("It is certified to the following " + norms + ".");
+  if (!sentences.length) return null;
+  return sentences.join(" ");
 }
 
 async function buildCompanySheet(record, findings, options) {
@@ -282,6 +332,14 @@ async function buildCompanySheet(record, findings, options) {
     specRow(row[0], row[1], null, idx % 2 === 1);
   });
 
+  // Recommended usage (misc/Recommend.txt): one-line context on the product sold.
+  const recommendation = buildRecommendation(f, lang);
+  if (recommendation) {
+    heading("Recommended usage");
+    para(recommendation, 10, font, 13);
+    y -= 2;
+  }
+
   // Ordering block: only when EAN / quantities were found.
   const eanF = f.ean;
   const ordF = f.orderInfo;
@@ -374,6 +432,7 @@ async function buildCompanySheet(record, findings, options) {
 module.exports = {
   buildCompanySheet: buildCompanySheet,
   readCompanyName: readCompanyName,
+  buildRecommendation: buildRecommendation,
   COMPANY_NAME_DEFAULT: COMPANY_NAME_DEFAULT,
   IDENTITY_KEYS: IDENTITY_KEYS,
   HERO_KEYS: HERO_KEYS,
