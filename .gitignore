@@ -1,0 +1,9 @@
+node_modules/
+data/uploads/
+data/watermarked/
+data/results/
+data/tmp/
+*.db
+*.db-journal
+.env
+*.md
