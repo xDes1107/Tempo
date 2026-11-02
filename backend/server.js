@@ -24,14 +24,16 @@ const { extractProductImage } = require("./product-image");
 const { buildCompanyJson } = require("./company-json");
 const { chatJson } = require("./meta-api");
 const { buildCompanyExcel } = require("./company-excel");
+const { normalizeLayout, defaultLayout } = require("./layout");
 const { buildTrustReport } = require("./trust");
 const { runAiReview } = require("./ai-review");
 const { runAiExtract } = require("./ai-extract");
-const { getConfig } = require("./meta-api");
+const { runStandardExtraction } = require("./ai-standard");
+const { getConfig, setUiConfig, clearUiConfig, configStatus } = require("./meta-api");
 const { SqliteJobStore } = require("./job-store-sqlite");
 
-const host = "localhost";
-const port = 7500;
+const host = process.env.HOST || "0.0.0.0";
+const port = parseInt(process.env.PORT || "7500", 10);
 const maximumFileSize = 10 * 1024 * 1024;
 const uploadsDir = nodePath.resolve(__dirname, "..", "data", "uploads");
 const watermarkedDir = nodePath.resolve(__dirname, "..", "data", "watermarked");
@@ -345,7 +347,7 @@ const server = http.createServer(async function (request, response) {
 
   // Opt-in AI enhancement over deterministic extraction.
   // POST /api/jobs/:id/ai-extract { model? }
-  // The deterministic record always exists first; the model fills missing
+  // Manual retry: AI-standard already ran on upload; this re-runs the AI fill on demand.
   // fields and may correct known misfire fields. Unevidenced values are
   // dropped on merge, then findings and trust are recomputed.
   if (request.method === "POST" && /^\/api\/jobs\/[^/]+\/ai-extract$/.test(pathname)) {
@@ -480,6 +482,30 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
+  // Option 1 layout (visual prompt): GET + POST /api/jobs/:id/layout
+  // Stored on record.layout, no DB migration. Company sheet/excel read it automatically.
+  if (pathname.match(/^\/api\/jobs\/[^/]+\/layout$/)) {
+    const layoutId = pathname.split("/").filter(Boolean)[2];
+    const layoutJob = store.get(layoutId);
+    if (!layoutJob) { sendJson(response, 404, { error: "Job not found." }); return; }
+    if (request.method === "GET") {
+      const layout = (layoutJob.record && layoutJob.record.layout) ? layoutJob.record.layout : defaultLayout();
+      sendJson(response, 200, { jobId: layoutId, layout: layout });
+      return;
+    }
+    if (request.method === "POST") {
+      const layoutBody = await readRequestBody(request);
+      let layoutInput = {};
+      try { layoutInput = JSON.parse(layoutBody.toString("utf8")); } catch (e) { sendJson(response, 400, { error: "Invalid JSON." }); return; }
+      const layout = normalizeLayout(layoutInput.layout || layoutInput);
+      layoutJob.record = layoutJob.record || {};
+      layoutJob.record.layout = layout;
+      const layoutUpdated = store.update(layoutId, { record: layoutJob.record, enriched: null });
+      sendJson(response, 200, { jobId: layoutId, layout: layout, job: withEnrichment(layoutUpdated) });
+      return;
+    }
+  }
+
   if (request.method === "GET" && pathname.indexOf("/api/jobs/") === 0) {
     const id = pathname.split("/").filter(Boolean).pop();
     const job = withEnrichment(store.get(id));
@@ -509,7 +535,13 @@ const server = http.createServer(async function (request, response) {
       await nodeFs.writeFile(nodePath.resolve(__dirname, "..", storedRel), fileBuffer);
       store.create({ id: jobId, fileName: fileName, createdAt: new Date().toISOString(), status: "processing", filePath: storedRel });
       const extractedText = await extractPdfText(fileBuffer);
-      const record = extractProductData(extractedText, fileName);
+      let record = extractProductData(extractedText, fileName);
+      try {
+        if (extractedText && extractedText.trim()) {
+          const std = await runStandardExtraction(extractedText, fileName, chatJson, {});
+          if (std && std.record) record = std.record;
+        }
+      } catch (e) { /* deterministic record above stands */ }
       const findings = validateRecord(record);
       const enriched = buildEnrichment(record, findings);
       const saved = await saveAnalysisResult(fileName, fileBuffer.length, extractedText, record, findings, enriched);
@@ -545,6 +577,27 @@ const server = http.createServer(async function (request, response) {
     return;
   }
 
+  
+  // UI credentials (demo): key + base URL entered above the upload, kept in server memory only.
+  // Never persisted to disk or DB, never logged, never returned to the client.
+  // Empty key falls back to env, then deterministic. Covers uploads AND sheet downloads.
+  if (pathname === "/api/config" && request.method === "GET") {
+    sendJson(response, 200, configStatus());
+    return;
+  }
+  if (pathname === "/api/config" && request.method === "POST") {
+    let cfgBody = {};
+    try { cfgBody = JSON.parse((await readRequestBody(request)).toString("utf8") || "{}"); } catch (e) { sendJson(response, 400, { error: "Invalid JSON." }); return; }
+    if (cfgBody.clear || (!cfgBody.apiKey && !cfgBody.baseUrl && !cfgBody.model)) {
+      sendJson(response, 200, clearUiConfig());
+      return;
+    }
+    if (cfgBody.apiKey && typeof cfgBody.apiKey !== "string") { sendJson(response, 400, { error: "apiKey must be a string." }); return; }
+    if (cfgBody.baseUrl && typeof cfgBody.baseUrl !== "string") { sendJson(response, 400, { error: "baseUrl must be a string." }); return; }
+    if (cfgBody.baseUrl && cfgBody.baseUrl.trim() && !/^https?:\/\//i.test(cfgBody.baseUrl.trim())) { sendJson(response, 400, { error: "baseUrl must start with http(s)://" }); return; }
+    sendJson(response, 200, setUiConfig({ apiKey: cfgBody.apiKey || "", baseUrl: cfgBody.baseUrl || "", model: cfgBody.model || "" }));
+    return;
+  }
   sendJson(response, 404, { error: "Route not found." });
 });
 

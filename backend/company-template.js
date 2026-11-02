@@ -1,8 +1,8 @@
 ﻿"use strict";
-// DataForge - standardized company-format document render (v2, DEXIS).
+// DataForge - standardized company-format document render (v2, Meta).
 // buildCompanySheet(record, findings, options) -> Promise<Buffer> (A4 PDF).
 //
-// Layout: DEXIS logo upper-left + company name, product title, hero band
+// Layout: Meta logo upper-left + company name, product title, hero band
 // (product image left, key fields right), document control box, ordering
 // block (EAN / quantities, only when found), specifications, website
 // descriptions, quality findings, evidence quotes, footer + disclaimer.
@@ -15,11 +15,11 @@
 // Specifications; empty fields are skipped (sheet is always downloadable).
 //
 // Locked defaults (operator-tunable without code edits):
-// - Company display name: process.env.COMPANY_NAME, default "DEXIS".
+// - Company display name: process.env.COMPANY_NAME, default "Meta".
 // - Page: A4 portrait, 48pt margins. Fixed for the demo.
 // - Watermark on the template: opt-in per request (watermarkPngBytes set),
 //   drawn centered at low opacity, same look as the stamp step.
-// - Logo: DEXIS.png bytes passed in as logoPngBytes (may be null -> skipped).
+// - Logo: Meta.png bytes passed in as logoPngBytes (may be null -> skipped).
 // - Product image: JPEG bytes passed in as productImageBytes (extracted
 //   best-effort from the source PDF); placeholder frame when absent.
 // pdf-lib is lazy-required (same pattern as report.js / watermark.js).
@@ -30,7 +30,7 @@ const { LANG_NAMES } = require("./translate");
 const { buildWebsiteDescription } = require("./enrich");
 const { sanitize, wrapText } = require("./pdf-text");
 
-const COMPANY_NAME_DEFAULT = "DEXIS";
+const COMPANY_NAME_DEFAULT = "Meta";
 const PAGE_W = 595;
 const PAGE_H = 842;
 const MARGIN = 48;
@@ -151,6 +151,21 @@ async function buildCompanySheet(record, findings, options) {
   const companyName = opts.companyName || readCompanyName();
   const safeRecord = record && record.fields ? record : { fields: {}, documentName: null, schemaVersion: "-", extractionEngine: "-" };
   const list = Array.isArray(findings) ? findings : [];
+  // Option 1 visual prompt: user-defined hero/order/hidden. Falls back to defaults.
+  let heroKeys = HERO_KEYS.slice();
+  let specKeys = SPEC_KEYS.slice();
+  let hideSet = {};
+  let showEvidence = true;
+  try {
+    const cand = (record && record.layout) || (opts && opts.layout) || null;
+    if (cand) {
+      const L = require("./layout").normalizeLayout(cand);
+      if (L.hero && L.hero.length) heroKeys = L.hero.slice();
+      if (L.specOrder && L.specOrder.length) specKeys = L.specOrder.slice();
+      (L.hidden || []).forEach(function (k) { hideSet[k] = true; });
+      showEvidence = L.showEvidence !== false;
+    }
+  } catch (e) { /* defaults stand */ }
 
   const pdf = await lib.PDFDocument.create();
   const font = await pdf.embedFont(lib.StandardFonts.Helvetica);
@@ -230,7 +245,7 @@ async function buildCompanySheet(record, findings, options) {
     y -= 6;
   }
 
-  // Header: DEXIS logo upper-left, company name beside it, title below.
+  // Header: Meta logo upper-left, company name beside it, title below.
   let headX = MARGIN; let logoBottom = null;
   if (logo) {
     const lw = Math.min(LOGO_H * (logo.width / logo.height), 140); const lh = lw * (logo.height / logo.width);
@@ -256,13 +271,15 @@ async function buildCompanySheet(record, findings, options) {
 
   // Hero band: product image left, key fields right.
   const heroRows = [];
-  ["manufacturer", "description", "standardsAndCertifications", "sizesAvailable", "colors"].forEach(function (key) {
+  heroKeys.forEach(function (key) {
+    if (hideSet[key]) return;
     const field = f[key];
     if (!field || !field.value) return;
     heroRows.push({ label: labelOf(key), source: valueText(field), translated: translatedText(field, lang) });
   });
   const catField = f.categorization;
-  heroRows.push({
+  const catHidden = !!hideSet["categorization"];
+  if (!catHidden) heroRows.push({
     label: labelOf("categorization"),
     source: (catField && catField.value) ? catField.value : "(taxonomy upload pending)",
     translated: (catField && catField.value) ? translatedText(catField, lang) : null
@@ -347,6 +364,7 @@ async function buildCompanySheet(record, findings, options) {
     heading("Ordering");
     let ostripe = false;
     COMMERCIAL_KEYS.forEach(function (key) {
+      if (hideSet[key]) return;
       const field = f[key];
       if (!field || !field.value) return;
       specRow(labelOf(key), valueText(field), translatedText(field, lang), ostripe);
@@ -357,7 +375,8 @@ async function buildCompanySheet(record, findings, options) {
   // Specifications: everything valued outside hero + ordering.
   heading("Specifications");
   let sstripe = false;
-  SPEC_KEYS.forEach(function (key) {
+  specKeys.forEach(function (key) {
+    if (hideSet[key]) return;
     const field = f[key];
     if (!field || !field.value) return;
     specRow(labelOf(key), valueText(field), translatedText(field, lang), sstripe);

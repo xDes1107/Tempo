@@ -61,12 +61,12 @@ async function main() {
   }
   const findings = validateRecord(record);
 
-  // 1. source-only sheet: DEXIS hero layout, taxonomy placeholder, no Ordering.
-  const src = await mod.buildCompanySheet(record, findings, { companyName: "DEXIS", jobId: "test-1" });
+  // 1. source-only sheet: Meta hero layout, taxonomy placeholder, no Ordering.
+  const src = await mod.buildCompanySheet(record, findings, { companyName: "Meta", jobId: "test-1" });
   assert.ok(Buffer.isBuffer(src), "source sheet is a Buffer");
   assert.strictEqual(src.subarray(0, 4).toString("ascii"), "%PDF", "source sheet is a PDF");
   const srcText = pdfText(src);
-  assert.ok(srcText.indexOf("DEXIS") !== -1, "DEXIS header renders");
+  assert.ok(srcText.indexOf("Meta") !== -1, "Meta header renders");
   assert.ok(srcText.indexOf("Categorization") !== -1, "categorization row renders");
   assert.ok(srcText.indexOf("taxonomy upload pending") !== -1, "taxonomy placeholder renders");
   assert.ok(srcText.indexOf("Norms") !== -1, "norms label renders");
@@ -82,7 +82,7 @@ async function main() {
     industriesOrApplications: "Industria alimentar"
   });
   record.translatedDescriptions = { pt: "Descricao fluente de teste." };
-  const pt = await mod.buildCompanySheet(record, findings, { lang: "pt", companyName: "DEXIS", jobId: "test-1" });
+  const pt = await mod.buildCompanySheet(record, findings, { lang: "pt", companyName: "Meta", jobId: "test-1" });
   assert.strictEqual(pt.subarray(0, 4).toString("ascii"), "%PDF", "pt sheet is a PDF");
   assert.ok(applied.length > 0, "translation slots filled: " + applied.join(","));
 
@@ -95,7 +95,7 @@ async function main() {
   setTestField(comm, "categorization", "PPE -> GLOVES -> Anticut protection");
   setTestField(comm, "ean", "4006381333931");
   setTestField(comm, "orderInfo", "Box of 100");
-  const commSheet = await mod.buildCompanySheet(comm, [], { companyName: "DEXIS", jobId: "test-comm" });
+  const commSheet = await mod.buildCompanySheet(comm, [], { companyName: "Meta", jobId: "test-comm" });
   assert.strictEqual(commSheet.subarray(0, 4).toString("ascii"), "%PDF", "commercial sheet is a PDF");
   const commText = pdfText(commSheet);
   assert.ok(commText.indexOf("Ordering") !== -1, "ordering block renders when found");
@@ -104,31 +104,31 @@ async function main() {
   assert.ok(commText.indexOf("PPE") !== -1, "categorization renders");
   assert.ok(commText.indexOf("taxonomy upload pending") === -1, "placeholder hidden when categorized");
 
-  // 4. DEXIS logo + watermark + real product image (JPEG from activarmr sample).
-  const logo = fs.readFileSync("misc/DEXIS.png");
+  // 4. Meta logo + watermark + real product image (JPEG from activarmr sample).
+  const logo = fs.readFileSync("misc/Meta.png");
   const actBytes = fs.readFileSync("sample-pdfs/activarmr-80-813_pds_pt.pdf");
   const prodImg = await extractProductImage(actBytes);
   assert.ok(prodImg && prodImg.length > 2000, "product image extracted from sample PDF");
   const wm = await mod.buildCompanySheet(record, findings, {
-    lang: "pt", companyName: "DEXIS", jobId: "test-1",
+    lang: "pt", companyName: "Meta", jobId: "test-1",
     logoPngBytes: logo, watermarkPngBytes: logo, watermarkOpacity: 0.08,
     productImageBytes: prodImg
   });
   assert.strictEqual(wm.subarray(0, 4).toString("ascii"), "%PDF", "watermarked sheet is a PDF");
   assert.ok(wm.length > pt.length, "watermarked sheet embeds the logo (" + wm.length + " > " + pt.length + ")");
   const wmText = pdfText(wm);
-  assert.ok(wmText.indexOf("DEXIS") !== -1, "DEXIS logo/name renders on watermarked sheet");
+  assert.ok(wmText.indexOf("Meta") !== -1, "Meta logo/name renders on watermarked sheet");
   assert.ok(wmText.indexOf("Product image") === -1, "placeholder hidden when product image embedded");
 
   // 5. company name default + env override
   delete process.env.COMPANY_NAME;
-  assert.strictEqual(mod.readCompanyName(), "DEXIS", "default company name");
+  assert.strictEqual(mod.readCompanyName(), "Meta", "default company name");
   process.env.COMPANY_NAME = "Acme Co";
   assert.strictEqual(mod.readCompanyName(), "Acme Co", "env override");
   delete process.env.COMPANY_NAME;
 
   // 6. empty record does not crash (always downloadable)
-  const empty = await mod.buildCompanySheet(createEmptyRecord("empty.pdf", "test"), [], { companyName: "DEXIS" });
+  const empty = await mod.buildCompanySheet(createEmptyRecord("empty.pdf", "test"), [], { companyName: "Meta" });
   assert.strictEqual(empty.subarray(0, 4).toString("ascii"), "%PDF", "empty-record sheet is a PDF");
 
   fs.mkdirSync("data/tmp", { recursive: true });

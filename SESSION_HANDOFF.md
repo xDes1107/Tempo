@@ -655,3 +655,28 @@ muse-spark-1.1
 ### Then
 - Deployment prep (Dockerfile + Render), README/demo refresh, video.
   Buffer Nov 2-3, early submit Nov 3. See you tomorrow.
+
+## Session Nov 2 (evening) - AI-standard flip + UI keys + layout editor + deploy unblockers
+
+- AI is now standard: new backend/ai-standard.js (AI attempts all 16 fields, deterministic
+  regex backfills unevidenced gaps, provenance on record.aiStandard). Upload route calls
+  runStandardExtraction() best-effort; missing key or error falls back to deterministic with
+  the reason in extractionEngine. POST /ai-extract kept as manual retry. New
+  run_ai_standard_test.js (stubbed, offline) green.
+- UI key box above upload: GET+POST /api/config, server memory only (never logged/persisted/
+  returned). Remember-key button via localStorage with auto-restore on load. Empty box falls
+  back to heuristic + deterministic. New run_config_test.js green.
+- Layout editor (Option 1, no canvas): backend/layout.js + GET/POST /api/jobs/:id/layout on
+  record.layout; company-template honors hero/order/hidden. UI has Save/Show/Reset; list hidden
+  until Show. BUG FIX: layout GET was shadowed by generic GET /api/jobs route - moved above it.
+- Frontend: labels capitalized via LAYOUT_LABELS, no [bracket] tags (dim + violet bar instead);
+  buttons color-coded (move slate, vis amber, hero violet, save green) slim 12px, 4x62px grid aligned.
+- Branding back to Meta for demo: watermark default + COMPANY_NAME_DEFAULT + tests use Meta/Meta.png.
+- Trust section renamed to Trust Report; top blurb removed; bottom line states engine + model
+  via describeRecordEngine() using record.aiStandard.
+- Deploy unblockers (tonight): HOST defaults 0.0.0.0, PORT from env, engines node>=22, new
+  .gitignore (node_modules, data/uploads|watermarked|results|tmp, *.db, .env).
+- All suites green: ai-standard, config, sheet, stamp, company-json, excel, trust, ai-extract, ai-review.
+- TOMORROW: deploy to one host with disk volume, seed one JEAN job live, record 90-sec demo
+  (key in box, upload, AI fills manufacturer, trust jumps, bilingual sheet), README demo section.
+  Do not add features; suite is green, keep it that way.

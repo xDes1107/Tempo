@@ -9,16 +9,29 @@
 var DEFAULT_BASE_URL = "https://api.meta.ai/v1";
 var DEFAULT_MODEL = "muse-spark-1.3"; // operator-tested Oct 28 on api.meta.ai
 
+var uiConfig = { apiKey: "", baseUrl: "", model: "" };
+function setUiConfig(input) {
+  input = input || {};
+  uiConfig.apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
+  uiConfig.baseUrl = typeof input.baseUrl === "string" ? input.baseUrl.trim().replace(/\/+$/, "") : "";
+  uiConfig.model = typeof input.model === "string" ? input.model.trim() : "";
+  return configStatus();
+}
+function clearUiConfig() { uiConfig = { apiKey: "", baseUrl: "", model: "" }; return configStatus(); }
+function configStatus() {
+  var cfg = getConfig();
+  return { configured: Boolean(cfg.apiKey), baseUrl: cfg.baseUrl, model: cfg.model, source: uiConfig.apiKey ? "ui" : (process.env.MODEL_API_KEY ? "env" : "none") };
+}
 function getConfig() {
-  var apiKey = process.env.MODEL_API_KEY || "";
-  var baseUrl = (process.env.MODEL_API_BASE || DEFAULT_BASE_URL).replace(/\/+$/, "");
-  return { apiKey: apiKey, baseUrl: baseUrl, model: process.env.MODEL_API_MODEL || DEFAULT_MODEL };
+  var apiKey = uiConfig.apiKey || process.env.MODEL_API_KEY || "";
+  var baseUrl = (uiConfig.baseUrl || process.env.MODEL_API_BASE || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  return { apiKey: apiKey, baseUrl: baseUrl, model: uiConfig.model || process.env.MODEL_API_MODEL || DEFAULT_MODEL };
 }
 
 function assertConfigured() {
   var cfg = getConfig();
   if (!cfg.apiKey) {
-    throw new Error("MODEL_API_KEY is not set. Export it locally, then retry (it is never stored in the repo).");
+    throw new Error("MODEL_API_KEY is not set. Enter it in the Meta API box above the upload, or export it locally.");
   }
   return cfg;
 }
@@ -96,5 +109,5 @@ async function chatVision(systemPrompt, userText, imageBase64, options) {
   var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
   return { raw: content, json: JSON.parse(content), model: data.model || (opts.model || cfg.model) };
 }
-module.exports = { getConfig: getConfig, verifyConnection: verifyConnection, chatJson: chatJson, chatVision: chatVision };
+module.exports = { getConfig: getConfig, setUiConfig: setUiConfig, clearUiConfig: clearUiConfig, configStatus: configStatus, verifyConnection: verifyConnection, chatJson: chatJson, chatVision: chatVision };
 

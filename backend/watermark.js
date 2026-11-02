@@ -18,7 +18,7 @@ const DEFAULTS = {
   position: "upper-right",
   margin: 36,
   footerBand: 0.12,
-  logoFile: path.resolve(__dirname, "..", "misc", "DEXIS.png"),
+  logoFile: path.resolve(__dirname, "..", "misc", "Meta.png"),
   footerFile: path.resolve(__dirname, "..", "misc", "Footer.jpg")
 };
 

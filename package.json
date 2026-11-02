@@ -15,5 +15,8 @@
   "dependencies": {
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

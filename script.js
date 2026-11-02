@@ -71,14 +71,27 @@ function renderList(listElement, values, emptyMessage) {
   });
 }
 
+function describeRecordEngine(record) {
+  if (!record) return "Engine unknown.";
+  var eng = record.extractionEngine || "unknown";
+  var std = record.aiStandard || {};
+  if (eng.indexOf("ai-standard-v1") === 0) {
+    var aiN = (std.aiFields || []).length;
+    var detN = (std.deterministicFields || []).length;
+    var model = std.model || "Meta model";
+    return "Extracted with AI (" + model + "): " + aiN + " AI fields, " + detN + " deterministic fallback.";
+  }
+  return "Extracted with deterministic rules (" + eng + ").";
+}
 function showCandidateResults(result) {
   const candidateData = result.candidateData;
 
   analysisResults.hidden = false;
 
   analysisSummary.textContent =
-    `${result.document.textCharacterCount} characters extracted ` +
-    `using ${candidateData.extractionMethod}. See the Trust list for every field and its evidence status.`;
+    `${result.document.textCharacterCount} characters. ` +
+    describeRecordEngine(result.record) +
+    ` See the Trust list for every field and its evidence status.`;
 
   analysisWarning.textContent = candidateData.warnings.join(" ");
 }
@@ -119,6 +132,7 @@ form.addEventListener("submit", async function (event) {
     companyFormat.hidden = false;
     if (trustSection) { trustSection.hidden = false; }
     loadTrust();
+    if (typeof loadLayout === "function") { try { loadLayout(); } catch (e) {} }
     loadModels();
     sheetLang = "";
     updateSheetLink();
@@ -303,7 +317,7 @@ async function loadModels() {
       aiModelSelect.append(opt);
     });
     if (aiExtractStatus && result.configured === false) {
-      aiExtractStatus.textContent = "Deterministic trust above is final until you enhance with AI. " + (result.note || "");
+      aiExtractStatus.textContent = "AI-standard extraction ran on upload; this button re-runs it. " + (result.note || "");
     }
   } catch (error) {
     if (aiExtractStatus) aiExtractStatus.textContent = "Model list unavailable: " + error.message;
@@ -315,8 +329,7 @@ const aiExtractStatus = document.querySelector("#ai-extract-status");
 
 function renderAiExtractedRecord(record) {
   if (!record) return;
-  analysisSummary.textContent =
-    "Enhanced by " + (record.extractionEngine || "AI") + ". See the Trust list for every field and its evidence status.";
+  analysisSummary.textContent = describeRecordEngine(record) + " See the Trust list for every field and its evidence status.";
 }
 async function runAiExtractNow() {
   if (!currentJobId) {
@@ -324,7 +337,7 @@ async function runAiExtractNow() {
     return;
   }
   const preEnhanceTrust = lastTrust;
-  if (aiExtractStatus) aiExtractStatus.textContent = "Running AI enhancement...";
+  if (aiExtractStatus) aiExtractStatus.textContent = "Re-running AI extraction...";
   try {
     const response = await fetch("/api/jobs/" + currentJobId + "/ai-extract", {
       method: "POST",
@@ -332,7 +345,7 @@ async function runAiExtractNow() {
       body: JSON.stringify({ model: aiModelSelect ? aiModelSelect.value : undefined })
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "AI enhancement failed.");
+    if (!response.ok) throw new Error(result.error || "AI extraction failed.");
     const ai = result.ai || {};
     currentRecord = result.record || currentRecord;
     renderAiExtractedRecord(currentRecord);
@@ -350,10 +363,245 @@ async function runAiExtractNow() {
       }
     }
   } catch (error) {
-    if (aiExtractStatus) aiExtractStatus.textContent = "AI enhancement failed: " + error.message;
+    if (aiExtractStatus) aiExtractStatus.textContent = "AI extraction failed: " + error.message;
   }
 }
 
 if (typeof aiExtractRun !== "undefined" && aiExtractRun) {
   aiExtractRun.addEventListener("click", runAiExtractNow);
 }
+
+// Option 1 visual prompt: sheet layout picker (no canvas).
+var LAYOUT_LABELS = {
+  productName: "Product name",
+  manufacturer: "Manufacturer",
+  modelOrReference: "Model / reference",
+  categoryOrIntendedUse: "Category / intended use",
+  description: "Description",
+  materials: "Materials",
+  dimensions: "Dimensions",
+  sizesAvailable: "Sizes",
+  colors: "Colors",
+  standardsAndCertifications: "Norms",
+  protectionLevelsOrPerformance: "Protection levels / performance",
+  usageRestrictionsOrWarnings: "Usage restrictions / warnings",
+  industriesOrApplications: "Industries / applications",
+  categorization: "Categorization",
+  ean: "EAN / barcode",
+  orderInfo: "Order / pack quantities"
+};
+function layoutLabel(key) { return LAYOUT_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1); }
+var layoutListEl = document.querySelector("#layout-list");
+var layoutHeroEl = document.querySelector("#layout-hero");
+var layoutStatusEl = document.querySelector("#layout-status");
+var currentLayout = null;
+async function loadLayout() {
+  if (!currentJobId || !layoutListEl) return;
+  layoutStatusEl.textContent = "Loading layout...";
+  try {
+    var r = await fetch("/api/jobs/" + currentJobId + "/layout");
+    var j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Layout load failed.");
+    currentLayout = j.layout;
+    if (document.querySelector("#layout-evidence") && typeof currentLayout.showEvidence === "boolean") {
+      document.querySelector("#layout-evidence").checked = currentLayout.showEvidence;
+    }
+    renderLayout();
+    layoutStatusEl.textContent = "";
+  } catch (e) { layoutStatusEl.textContent = "Layout unavailable: " + e.message; }
+}
+function renderLayout() {
+  if (!currentLayout || !layoutListEl) return;
+  layoutListEl.replaceChildren();
+  if (layoutHeroEl) {
+    var heroNames = (currentLayout.hero || []).map(layoutLabel);
+    layoutHeroEl.textContent = heroNames.length ? "Hero: " + heroNames.join(", ") : "Hero: none";
+  }
+  (currentLayout.specOrder || []).forEach(function (key, idx) {
+    var hid = currentLayout.hidden.indexOf(key) !== -1;
+    var isHero = currentLayout.hero.indexOf(key) !== -1;
+    var li = document.createElement("li");
+    li.className = "layout-row" + (hid ? " is-hidden" : "") + (isHero ? " is-hero" : "");
+    var name = document.createElement("span");
+    name.className = "layout-name";
+    name.textContent = layoutLabel(key);
+    var actions = document.createElement("span");
+    actions.className = "layout-actions";
+    var up = document.createElement("button"); up.type = "button"; up.textContent = "Up"; up.className = "btn-move";
+    up.addEventListener("click", function () { moveLayoutKey(idx, -1); });
+    var dn = document.createElement("button"); dn.type = "button"; dn.textContent = "Down"; dn.className = "btn-move";
+    dn.addEventListener("click", function () { moveLayoutKey(idx, 1); });
+    var tg = document.createElement("button"); tg.type = "button"; tg.textContent = hid ? "Show" : "Hide"; tg.className = "btn-vis";
+    tg.addEventListener("click", function () { toggleLayoutKey(key); });
+    var hb = document.createElement("button"); hb.type = "button"; hb.textContent = isHero ? "Unhero" : "Hero"; hb.className = "btn-hero";
+    hb.addEventListener("click", function () { toggleLayoutHero(key); });
+    actions.append(up, dn, tg, hb);
+    li.append(name, actions);
+    layoutListEl.append(li);
+  });
+}
+function moveLayoutKey(i, d) {
+  var a = currentLayout.specOrder;
+  var j = i + d;
+  if (j < 0 || j >= a.length) return;
+  var t = a[i]; a[i] = a[j]; a[j] = t;
+  renderLayout();
+}
+function toggleLayoutKey(k) {
+  var h = currentLayout.hidden;
+  var i = h.indexOf(k);
+  if (i === -1) h.push(k); else h.splice(i, 1);
+  renderLayout();
+}
+function toggleLayoutHero(k) {
+  var h = currentLayout.hero;
+  var i = h.indexOf(k);
+  if (i === -1) h.push(k); else h.splice(i, 1);
+  renderLayout();
+}
+var layoutSaveBtn = document.querySelector("#layout-save");
+if (layoutSaveBtn) {
+  layoutSaveBtn.addEventListener("click", async function () {
+    if (!currentJobId || !currentLayout) { layoutStatusEl.textContent = "Upload a PDF first."; return; }
+    layoutStatusEl.textContent = "Saving...";
+    var evBox = document.querySelector("#layout-evidence");
+    if (evBox) currentLayout.showEvidence = evBox.checked;
+    try {
+      var r = await fetch("/api/jobs/" + currentJobId + "/layout", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layout: currentLayout })
+      });
+      var j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Save failed.");
+      currentLayout = j.layout;
+      renderLayout();
+      if (typeof setLayoutVisible === "function") setLayoutVisible(true);
+      layoutStatusEl.textContent = "Saved. Sheet downloads now use this layout.";
+      if (typeof updateSheetLink === "function") updateSheetLink();
+    } catch (e) { layoutStatusEl.textContent = "Save failed: " + e.message; }
+  });
+}
+var layoutResetBtn = document.querySelector("#layout-reset");
+if (layoutResetBtn) {
+  layoutResetBtn.addEventListener("click", async function () {
+    if (!currentJobId) return;
+    layoutStatusEl.textContent = "Resetting...";
+    try {
+      var r = await fetch("/api/jobs/" + currentJobId + "/layout", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layout: {} })
+      });
+      var j = await r.json();
+      currentLayout = j.layout;
+      renderLayout();
+      layoutStatusEl.textContent = "Reset to default.";
+    } catch (e) { layoutStatusEl.textContent = "Reset failed: " + e.message; }
+  });
+}
+
+// UI credentials: key + link above the upload, server memory only.
+var apiKeyInput = document.querySelector("#api-key");
+var apiBaseInput = document.querySelector("#api-base");
+var apiSaveBtn = document.querySelector("#api-save");
+var apiClearBtn = document.querySelector("#api-clear");
+var apiStatusEl = document.querySelector("#api-status");
+async function refreshApiStatus() {
+  if (!apiStatusEl) return;
+  try {
+    var r = await fetch("/api/config");
+    var j = await r.json();
+    if (j.configured) apiStatusEl.textContent = "AI on via " + j.source + " (" + j.model + "). Empty the box to fall back.";
+    else apiStatusEl.textContent = "No key set. Uploads use heuristic and deterministic fallback.";
+    if (j.baseUrl && apiBaseInput && !apiBaseInput.value) apiBaseInput.placeholder = j.baseUrl;
+  } catch (e) { apiStatusEl.textContent = "Key status unavailable."; }
+}
+if (apiSaveBtn) {
+  apiSaveBtn.addEventListener("click", async function () {
+    apiStatusEl.textContent = "Saving...";
+    try {
+      var r = await fetch("/api/config", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: apiKeyInput ? apiKeyInput.value : "", baseUrl: apiBaseInput ? apiBaseInput.value : "" })
+      });
+      var j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Save failed.");
+      if (apiKeyInput) apiKeyInput.value = "";
+      await refreshApiStatus();
+    } catch (e) { apiStatusEl.textContent = "Save failed: " + e.message; }
+  });
+}
+if (apiClearBtn) {
+  apiClearBtn.addEventListener("click", async function () {
+    apiStatusEl.textContent = "Clearing...";
+    try {
+      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clear: true }) });
+      try { localStorage.removeItem(REM_KEY); localStorage.removeItem(REM_BASE); localStorage.setItem(REM_KEY + ".on", "0"); paintRemember(); } catch (e) {}
+      if (apiKeyInput) apiKeyInput.value = "";
+      await refreshApiStatus();
+    } catch (e) { apiStatusEl.textContent = "Clear failed: " + e.message; }
+  });
+}
+if (typeof refreshApiStatus === "function") { try { refreshApiStatus(); } catch (e) {} }
+
+// Layout visibility: list stays hidden until Show layout is pressed.
+var layoutShowBtn = document.querySelector("#layout-show");
+function setLayoutVisible(v) {
+  var hero = document.querySelector("#layout-hero");
+  var list = document.querySelector("#layout-list");
+  var evRow = document.querySelector("#layout-evidence-row");
+  if (hero) hero.hidden = !v;
+  if (list) list.hidden = !v;
+  if (evRow) evRow.hidden = !v;
+  if (layoutShowBtn) layoutShowBtn.textContent = v ? "Hide layout" : "Show layout";
+}
+function isLayoutVisible() {
+  var list = document.querySelector("#layout-list");
+  return list ? !list.hidden : false;
+}
+if (layoutShowBtn) {
+  layoutShowBtn.addEventListener("click", async function () {
+    if (isLayoutVisible()) { setLayoutVisible(false); return; }
+    setLayoutVisible(true);
+    if (typeof loadLayout === "function" && currentJobId) { try { await loadLayout(); } catch (e) {} }
+    else if (typeof renderLayout === "function") { try { renderLayout(); } catch (e) {} }
+  });
+}
+
+// Remember key: browser localStorage only, auto-restores to server memory on load.
+var REM_KEY = "dataforge.apiKey";
+var REM_BASE = "dataforge.apiBase";
+var apiRememberBtn = document.querySelector("#api-remember");
+function isRememberOn() { try { return localStorage.getItem(REM_KEY + ".on") === "1"; } catch (e) { return false; } }
+function paintRemember() { if (apiRememberBtn) apiRememberBtn.textContent = "Remember key: " + (isRememberOn() ? "on" : "off"); if (apiRememberBtn) apiRememberBtn.classList.toggle("on", isRememberOn()); }
+async function restoreRemembered() {
+  paintRemember();
+  var k = ""; var b = "";
+  try { k = localStorage.getItem(REM_KEY) || ""; b = localStorage.getItem(REM_BASE) || ""; } catch (e) {}
+  if (!isRememberOn() || !k) return;
+  if (apiBaseInput && !apiBaseInput.value && b) apiBaseInput.value = b;
+  try {
+    await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: k, baseUrl: b }) });
+    if (apiStatusEl) apiStatusEl.textContent = "Restored remembered key. Uploads use AI.";
+    if (typeof refreshApiStatus === "function") await refreshApiStatus();
+  } catch (e) { /* status stays */ }
+}
+if (apiRememberBtn) {
+  apiRememberBtn.addEventListener("click", async function () {
+    var on = isRememberOn();
+    try {
+      if (on) { localStorage.removeItem(REM_KEY); localStorage.removeItem(REM_BASE); localStorage.setItem(REM_KEY + ".on", "0"); }
+      else {
+        var k = apiKeyInput && apiKeyInput.value ? apiKeyInput.value : "";
+        var st = null;
+        try { st = await (await fetch("/api/config")).json(); } catch (e) {}
+        if (!k) { if (apiStatusEl) apiStatusEl.textContent = "Type the key first, then press Remember. (The server never shows a saved key.)"; return; }
+        if (k) { localStorage.setItem(REM_KEY, k); localStorage.setItem(REM_BASE, apiBaseInput ? apiBaseInput.value : ""); }
+        // key must be typed: server never returns a stored key, env keys need no remembering
+        localStorage.setItem(REM_KEY + ".on", "1");
+        if (apiKeyInput) apiKeyInput.value = "";
+      }
+    } catch (e) {}
+    paintRemember();
+  });
+}
+if (typeof restoreRemembered === "function") { try { restoreRemembered(); } catch (e) {} }

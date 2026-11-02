@@ -2,7 +2,7 @@
   "artifact": "dataforge/company-document",
   "artifactVersion": "1.1.0-2026-10-30",
   "generatedAt": "2026-10-29T00:00:00.000Z",
-  "companyName": "DEXIS",
+  "companyName": "Meta",
   "jobId": "test-json-1",
   "documentControl": {
     "sourceDocument": "synthetic-glove-sample.pdf",

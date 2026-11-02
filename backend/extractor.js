@@ -1,8 +1,8 @@
 "use strict";
 // Deterministic extraction mapped onto the 16-field schema (v2.2).
 // Method: deterministic-rules-v2.2. Regex candidates only -
-// every value needs human review. AI (Meta Model API) replaces the
-// finders next but keeps this output shape and evidence contract.
+// every value needs human review. Secondary fallback: AI-standard (Meta Model API)
+// runs first on upload; this pass fills whatever AI leaves unevidenced.
 
 const { createEmptyRecord, makeEvidence } = require("./schema");
 

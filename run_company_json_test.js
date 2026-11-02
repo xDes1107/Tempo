@@ -35,12 +35,12 @@ async function main() {
   record.fields.ean.originalValue = "EAN: 4006381333931";
   record.fields.orderInfo.value = "Box of 100";
   record.fields.orderInfo.originalValue = "Box of 100";
-  const doc = mod.buildCompanyJson(job, { companyName: "DEXIS", generatedAt: "2026-10-29T00:00:00.000Z" });
+  const doc = mod.buildCompanyJson(job, { companyName: "Meta", generatedAt: "2026-10-29T00:00:00.000Z" });
 
   assert.strictEqual(doc.artifact, "dataforge/company-document");
   assert.strictEqual(doc.artifactVersion, mod.ARTIFACT_VERSION);
   assert.strictEqual(doc.jobId, "test-json-1");
-  assert.strictEqual(doc.companyName, "DEXIS");
+  assert.strictEqual(doc.companyName, "Meta");
   assert.strictEqual(doc.fields.colors.value, "Midnight blue");
   assert.strictEqual(doc.fields.categorization.value, "PPE -> GLOVES -> Anticut protection");
   assert.strictEqual(doc.fields.ean.value, "4006381333931");

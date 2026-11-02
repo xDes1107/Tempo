@@ -1,8 +1,8 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="script.js?v=stamp1" defer></script>
-  <link rel="stylesheet" href="styles.css?v=stamp1">
+    <script src="script.js?v=layout3" defer></script>
+  <link rel="stylesheet" href="styles.css?v=layout3">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DataForge</title>
@@ -14,6 +14,21 @@
     <p>
       Upload a supplier PDF to forge standardized company data.
     </p>
+
+    <section id="api-key-box" aria-label="Meta API credentials">
+      <h2>Meta API</h2>
+      <p>Enter your key and link for AI extraction. Leave empty to use heuristic and deterministic fallback.</p>
+      <label for="api-key">Key</label>
+      <input id="api-key" name="api-key" type="password" autocomplete="off" placeholder="Paste key here" />
+      <label for="api-base">Link</label>
+      <input id="api-base" name="api-base" type="text" inputmode="url" placeholder="https://api.meta.ai/v1" />
+      <div class="api-row">
+        <button type="button" id="api-save">Save key</button>
+        <button type="button" id="api-clear">Clear</button>
+        <button type="button" id="api-remember">Remember key: off</button>
+      </div>
+      <p id="api-status" aria-live="polite"></p>
+    </section>
 
     <form>
       <label for="pdf-file">Choose a PDF file</label>
@@ -33,15 +48,14 @@
     </form>
     <div class="triage">
     <section id="trust" class="tmain" hidden>
-  <h2>Results and Trust</h2>
-  <p>Deterministic quality score (illustrative, not a probability). Every field below shows its evidence status. AI steps run only when you ask.</p>
+  <h2>Trust Report</h2>
   <div id="trust-summary" aria-live="polite"></div>
   <p id="analysis-summary"></p>
   <ul id="trust-list"></ul>
   <p id="analysis-warning"></p>
   <div class="lang-row" role="group" aria-label="AI enhancement model">
     <select id="ai-model" aria-label="AI model for enhancement"></select>
-    <button type="button" id="ai-extract-run">Enhance with AI</button>
+    <button type="button" id="ai-extract-run">Re-run AI extraction</button>
   </div>
   <p id="ai-extract-status" aria-live="polite"></p>
   </section>
@@ -78,6 +92,18 @@
   </div>
 
   <label><input type="checkbox" id="sheet-watermark"> Include stamp logo on the sheet</label>
+
+  <div id="layout-editor">
+    <h3>Sheet layout (visual prompt)</h3>
+    <p>Tick fields to show, use Up/Down to order. Hero fields render big on top.</p>
+    <p id="layout-hero" hidden aria-live="polite"></p>
+    <ul id="layout-list" hidden></ul>
+    <label id="layout-evidence-row" hidden><input type="checkbox" id="layout-evidence" checked> Show evidence quotes</label>
+    <p><button type="button" id="layout-save">Save layout</button>
+    <button type="button" id="layout-show">Show layout</button>
+    <button type="button" id="layout-reset">Reset</button></p>
+    <p id="layout-status" aria-live="polite"></p>
+  </div>
 
   <p><a id="sheet-download" hidden>Download company data sheet (PDF)</a></p>
   <p><a id="sheet-excel-download" hidden>Download ERP import Excel (.xlsx)</a></p>
