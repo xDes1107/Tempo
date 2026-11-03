@@ -1,0 +1,16 @@
+The goal of the recommendation description is to add a little context on the product sold. As usual keep it simple. Get the info from the technical sheets provided.
+
+Example:
+
+This is [Product] is made by [Manufacturer]. It is a [Type of product] [Product Type i.e. Glove, Helmet], its recommended to be used for [Area of use] and/or [Area of use]. Is it certified to the following [Norms and certifications].
+
+
+
+
+# Illustrative for Text logic do not put in the file.
+Product -> Type (What is it) -> Area of use -> Norms and certifications
+
+Example:
+
+Glove -> Anti-cut Glove -> Food industry -> EN XXXX
+
