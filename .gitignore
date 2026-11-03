@@ -6,4 +6,10 @@ data/tmp/
 *.db
 *.db-journal
 .env
-*.md
+01_Project_Overview.md
+02_System_Architecture.md
+03_Roadmap_v2.md
+04_AI_Translation_Spike_Spec.md
+AGENTS.md
+
+
