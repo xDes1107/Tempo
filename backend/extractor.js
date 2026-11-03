@@ -221,3 +221,4 @@ function extractProductData(text, documentName) {
 }
 
 module.exports = { extractProductData: extractProductData, findIndustriesOrApplications: findIndustriesOrApplications };
+

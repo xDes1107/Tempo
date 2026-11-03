@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge - standardized company-format document render (v2, Meta).
+"use strict";
+// Tempo - standardized company-format document render (v2, Meta).
 // buildCompanySheet(record, findings, options) -> Promise<Buffer> (A4 PDF).
 //
 // Layout: Meta logo upper-left + company name, product title, hero band
@@ -242,7 +242,7 @@ async function buildCompanySheet(record, findings, options) {
         y -= 13;
       });
     });
-    y -= 6;
+    y -= 8;
   }
 
   // Header: Meta logo upper-left, company name beside it, title below.
@@ -268,6 +268,7 @@ async function buildCompanySheet(record, findings, options) {
     safeRecord.documentName || "Unknown product";
   para(title, 14, bold, 19);
   y -= 2;
+  drawRule();
 
   // Hero band: product image left, key fields right.
   const heroRows = [];

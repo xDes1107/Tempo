@@ -116,3 +116,4 @@ class SqliteJobStore {
 
 module.exports = { SqliteJobStore: SqliteJobStore, DEFAULT_DB_PATH: DEFAULT_DB_PATH };
 
+

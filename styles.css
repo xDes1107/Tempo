@@ -354,6 +354,12 @@ input[type="file"] {
   font-size: 14px;
 }
 
+#company-format .lang-row button.selected {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: #fff;
+}
+
 
 /* Layout editor (Option 1 visual prompt) */
 #layout-editor { margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px; }

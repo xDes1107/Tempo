@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // Option 1 visual prompt: user-defined sheet layout, no canvas.
 // Layout shape: { hero: [keys], specOrder: [keys], hidden: [keys], showEvidence: bool, updatedAt }
 // All keys validated against schema FIELD_KEYS. Unknown keys dropped.

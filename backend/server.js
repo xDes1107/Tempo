@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge backend - 11-field schema v2.1 + SQLite job store.
+"use strict";
+// Tempo backend - 11-field schema v2.1 + SQLite job store.
 // Serves the frontend static (index.html is the entry point) and the API.
 // POST /api/documents keeps legacy candidateData so the vanilla frontend
 // keeps working; new clients use jobId + record + findings + enriched.
@@ -142,7 +142,7 @@ const server = http.createServer(async function (request, response) {
   }
 
   if (request.method === "GET" && pathname === "/health") {
-    sendJson(response, 200, { status: "ok", message: "DataForge backend is running." });
+    sendJson(response, 200, { status: "ok", message: "Tempo backend is running." });
     return;
   }
 
@@ -328,7 +328,7 @@ const server = http.createServer(async function (request, response) {
   // returns the last-known list so the dropdown always renders.
   if (request.method === "GET" && pathname === "/api/models") {
     const cfg = getConfig();
-    const fallback = ["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.1", "muse-wonder-1.0", "sam-3.1", "muse-spark-1.3-contributor", "muse-spark-1.2-contributor", "muse-voice-transcribe-1.0", "muse-image-1.0"];
+    const TEXT_MODELS = ["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.1", "muse-wonder-1.0", "sam-3.1"];    const fallback = TEXT_MODELS.slice();
     if (!cfg.apiKey) {
       sendJson(response, 200, { models: fallback, default: cfg.model, configured: false, note: "MODEL_API_KEY is not set on the server. Set it and restart to list live models." });
       return;
@@ -337,7 +337,7 @@ const server = http.createServer(async function (request, response) {
       const res = await fetch(cfg.baseUrl + "/models", { headers: { Authorization: "Bearer " + cfg.apiKey } });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      const ids = (Array.isArray(data.data) ? data.data : []).map(function (m) { return m.id || m.name; }).filter(Boolean);
+      const ids = (Array.isArray(data.data) ? data.data : []).map(function (m) { return m.id || m.name; }).filter(function (id) { return TEXT_MODELS.indexOf(id) !== -1; }).filter(Boolean);
       sendJson(response, 200, { models: ids.length ? ids : fallback, default: cfg.model, configured: true, baseUrl: cfg.baseUrl });
     } catch (error) {
       sendJson(response, 200, { models: fallback, default: cfg.model, configured: false, note: "Live list failed (" + error.message + "). Showing last-known list." });
@@ -604,5 +604,8 @@ const server = http.createServer(async function (request, response) {
 server.listen(port, host, function () {
   console.log("Server running at http://" + host + ":" + port);
 });
+
+
+
 
 

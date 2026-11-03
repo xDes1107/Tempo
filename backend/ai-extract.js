@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge - manual AI retry over the AI-standard record.
+"use strict";
+// Tempo - manual AI retry over the AI-standard record.
 // The deterministic regex record always renders first; this runs ONLY when
 // the user clicks Re-run AI extraction (AI-standard already ran on upload). The model fills missing fields and may
 // correct known misfire fields (manufacturer noise, protection year-as-value,
@@ -170,3 +170,4 @@ module.exports = {
   mergeAiExtract: mergeAiExtract,
   runAiExtract: runAiExtract
 };
+

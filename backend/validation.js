@@ -59,3 +59,4 @@ function validateRecord(record) {
 }
 
 module.exports = { REQUIRED_FIELDS: REQUIRED_FIELDS, validateRecord: validateRecord };
+

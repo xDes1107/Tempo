@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge - AI-standard extraction with deterministic fallback.
+"use strict";
+// Tempo - AI-standard extraction with deterministic fallback.
 // Upload path: AI attempts ALL 16 schema fields first (Meta Model API),
 // deterministic regex fills whatever AI leaves empty or unevidenced.
 // AI never throws: missing key, network error, or empty source all fall
@@ -188,3 +188,4 @@ module.exports = {
   mergeAiStandard: mergeAiStandard,
   runStandardExtraction: runStandardExtraction
 };
+

@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge - shared PDF text helpers (extracted from the old report.js when
+"use strict";
+// Tempo - shared PDF text helpers (extracted from the old report.js when
 // the standalone translation report was removed; company-template.js is the
 // remaining PDF renderer and keeps using these).
 

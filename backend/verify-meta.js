@@ -8,3 +8,4 @@ api.verifyConnection().then(function (info) {
   console.error("verify:meta FAILED: " + e.message);
   process.exit(1);
 });
+

@@ -12,7 +12,7 @@ const { buildEnrichment, buildWebsiteDescription } = require("./enrich");
 const { TARGET_LANGS } = require("./translate");
 const { readCompanyName, buildRecommendation } = require("./company-template");
 
-const ARTIFACT_TYPE = "dataforge/company-document";
+const ARTIFACT_TYPE = "tempo/company-document";
 const ARTIFACT_VERSION = "1.1.0-2026-10-30";
 
 function buildCompanyJson(job, options) {
@@ -67,3 +67,4 @@ module.exports = {
   ARTIFACT_TYPE: ARTIFACT_TYPE,
   ARTIFACT_VERSION: ARTIFACT_VERSION
 };
+

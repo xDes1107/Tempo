@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // Goal 3 translation - simple first step (Oct 28).
 // Translates the validated record via the Meta Model API (same adapter as
 // extraction). No OCR and no AI extraction here: the input is the existing
@@ -36,7 +36,7 @@ function buildTranslatePrompt(record, targetLang, websiteDescription) {
     "numeric values, units of measure, and standards and certification codes",
     "(e.g. EN 388, ISO 13997) EXACTLY as in the source, even inside translated sentences;",
     "if a value is already a code, number, or proper name with no translation, return it unchanged;",
-    "translate every key provided, add none, no commentary."
+    "translate every key provided, add none, no commentary; for list-like values \(colors, materials, industries\) translate each item separately but keep separators \(, ; /\) and keep codes/numbers/units unchanged inside each item."
   ].join(" ");
   const user = JSON.stringify({
     targetLang: targetLang,
@@ -116,3 +116,5 @@ module.exports = {
   recordWithTranslations: recordWithTranslations,
   recordNeedsTranslation: recordNeedsTranslation
 };
+
+

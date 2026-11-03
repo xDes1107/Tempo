@@ -47,3 +47,4 @@ async function saveAnalysisResult(fileName, fileSize, extractedText, recordOrLeg
 }
 
 module.exports = { saveAnalysisResult: saveAnalysisResult };
+

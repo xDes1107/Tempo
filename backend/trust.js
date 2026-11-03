@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge - deterministic Trust Report (no AI call, offline-safe).
+"use strict";
+// Tempo - deterministic Trust Report (no AI call, offline-safe).
 // buildTrustReport(record, findings) -> { score, counts, fields, generatedAt }.
 // Score is a transparent heuristic (NOT a calibrated probability):
 //   start 100, -12 per missing REQUIRED field, -4 per valued-but-unsourced

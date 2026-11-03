@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // Company Excel export - ERP import template format, genuine .xlsx, zero new deps.
 // The column layout mirrors misc/XLXS_Template.xls (the company ERP import
 // template, which stays untouched): 84 columns, header row + one filled data row.
@@ -332,3 +332,4 @@ module.exports = {
   crc32: crc32,
   zipStoreFiles: zipStoreFiles
 };
+

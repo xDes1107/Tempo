@@ -1,5 +1,5 @@
 "use strict";
-// DataForge - 16-field product schema.
+// Tempo - 16-field product schema.
 // Version: 2.2.0-2026-10-30 (DEXIS sheet polish: adds optional description,
 // colors, categorization, ean, orderInfo for the commercial block).
 // Every extracted field keeps: value (normalized, source language),
@@ -21,10 +21,10 @@ const FIELDS = [
   { key: "sizesAvailable", label: "Sizes", required: false, translatable: false, allowsUnit: false },
   { key: "colors", label: "Colors", required: false, translatable: true, allowsUnit: false },
   { key: "standardsAndCertifications", label: "Norms", required: false, translatable: false, allowsUnit: false },
-  { key: "protectionLevelsOrPerformance", label: "Protection levels / performance", required: false, translatable: false, allowsUnit: true },
+  { key: "protectionLevelsOrPerformance", label: "Protection levels / performance", required: false, translatable: true, allowsUnit: true },
   { key: "usageRestrictionsOrWarnings", label: "Usage restrictions / warnings", required: false, translatable: true, allowsUnit: false },
   { key: "industriesOrApplications", label: "Industries / applications", required: false, translatable: true, allowsUnit: false },
-  { key: "categorization", label: "Categorization", required: false, translatable: false, allowsUnit: false },
+  { key: "categorization", label: "Categorization", required: false, translatable: true, allowsUnit: false },
   { key: "ean", label: "EAN / barcode", required: false, translatable: false, allowsUnit: false },
   { key: "orderInfo", label: "Order / pack quantities", required: false, translatable: false, allowsUnit: false }
 ];
@@ -106,3 +106,4 @@ module.exports = {
   makeEvidence: makeEvidence,
   migrateRecord: migrateRecord
 };
+

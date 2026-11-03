@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 // Meta Model API adapter (OpenAI-compatible chat completions).
 // Config: MODEL_API_KEY (required), MODEL_API_BASE (optional,
 // defaults to https://api.llama.com/v1). The key is read only from
@@ -110,4 +110,5 @@ async function chatVision(systemPrompt, userText, imageBase64, options) {
   return { raw: content, json: JSON.parse(content), model: data.model || (opts.model || cfg.model) };
 }
 module.exports = { getConfig: getConfig, setUiConfig: setUiConfig, clearUiConfig: clearUiConfig, configStatus: configStatus, verifyConnection: verifyConnection, chatJson: chatJson, chatVision: chatVision };
+
 

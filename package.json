@@ -1,5 +1,5 @@
 {
-  "name": "dataforge",
+  "name": "tempo",
   "version": "1.0.0",
   "main": "script.js",
   "scripts": {
@@ -11,7 +11,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "DataForge - supplier PDF datasheets into standardized company data (JSON + PDF sheet).",
+  "description": "Tempo - supplier PDF datasheets into standardized company data (JSON + PDF sheet).",
   "dependencies": {
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5"
@@ -20,3 +20,4 @@
     "node": ">=22"
   }
 }
+

@@ -25,3 +25,4 @@ async function main() {
 }
 
 main().catch(function (e) { console.error("list-models FAILED: " + e.message); process.exit(1); });
+

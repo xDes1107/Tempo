@@ -188,25 +188,25 @@ watermarkApply.addEventListener("click", async function () {
 
 // Company-format sheet (Goal 3b template render).
 function updateSheetLink() {
-  if (!currentJobId) {
-    sheetDownload.hidden = true;
-  sheetExcelDownload.hidden = true;
-    return;
+  if (!currentJobId) { sheetDownload.hidden = true; sheetExcelDownload.hidden = true; return; }
+  document.querySelectorAll("#company-format [data-sheet-lang]").forEach(function (b) {
+    b.classList.toggle("selected", (b.getAttribute("data-sheet-lang") || "") === sheetLang);
+  });
+  if (!sheetLang) { sheetDownload.hidden = true; }
+  else {
+    let url = "/api/jobs/" + currentJobId + "/company-sheet?lang=" + sheetLang;
+    if (sheetWatermark && sheetWatermark.checked) url += "&watermark=true";
+    sheetDownload.href = url;
+    sheetDownload.textContent = "Download company data sheet (PDF)";
+    sheetDownload.hidden = false;
   }
-  let url = "/api/jobs/" + currentJobId + "/company-sheet";
-  const q = [];
-  if (sheetLang) q.push("lang=" + sheetLang);
-  if (sheetWatermark && sheetWatermark.checked) q.push("watermark=true");
-  if (q.length) url += "?" + q.join("&");
-  sheetDownload.href = url;
-  sheetDownload.hidden = false;
   sheetExcelDownload.href = "/api/jobs/" + currentJobId + "/company-excel" + (sheetLang ? "?lang=" + sheetLang : "");
   sheetExcelDownload.hidden = false;
 }
-
 document.querySelectorAll("#company-format [data-sheet-lang]").forEach(function (button) {
   button.addEventListener("click", function () {
-    sheetLang = button.getAttribute("data-sheet-lang") || "";
+    const v = button.getAttribute("data-sheet-lang") || "";
+    sheetLang = (sheetLang === v) ? "" : v; // second click unclicks
     updateSheetLink();
   });
 });
@@ -568,8 +568,8 @@ if (layoutShowBtn) {
 }
 
 // Remember key: browser localStorage only, auto-restores to server memory on load.
-var REM_KEY = "dataforge.apiKey";
-var REM_BASE = "dataforge.apiBase";
+var REM_KEY = "tempo.apiKey";
+var REM_BASE = "tempo.apiBase";
 var apiRememberBtn = document.querySelector("#api-remember");
 function isRememberOn() { try { return localStorage.getItem(REM_KEY + ".on") === "1"; } catch (e) { return false; } }
 function paintRemember() { if (apiRememberBtn) apiRememberBtn.textContent = "Remember key: " + (isRememberOn() ? "on" : "off"); if (apiRememberBtn) apiRememberBtn.classList.toggle("on", isRememberOn()); }
@@ -605,3 +605,4 @@ if (apiRememberBtn) {
   });
 }
 if (typeof restoreRemembered === "function") { try { restoreRemembered(); } catch (e) {} }
+

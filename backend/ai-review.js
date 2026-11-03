@@ -1,5 +1,5 @@
-﻿"use strict";
-// DataForge - on-demand AI review that also fixes what it flags.
+"use strict";
+// Tempo - on-demand AI review that also fixes what it flags.
 // The deterministic trust report always renders first; this runs ONLY when
 // the user picks a model and clicks Run AI review. Besides the score and
 // findings, the model may propose corrections (better field values backed by
