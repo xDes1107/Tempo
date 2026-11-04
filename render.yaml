@@ -1,4 +1,4 @@
-services:
+﻿services:
   - type: web
     name: dataforge
     runtime: docker
@@ -14,6 +14,6 @@ services:
       - key: MODEL_API_MODEL
         value: muse-spark-1.3
       - key: COMPANY_NAME
-        value: Meta
+        value: Tempo
       - key: MODEL_API_KEY
         sync: false

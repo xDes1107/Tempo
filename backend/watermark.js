@@ -1,9 +1,9 @@
-"use strict";
+﻿"use strict";
 // Goal 2 watermark stamper (pdf-lib, pure JS, single-deploy friendly).
 // Usage as module: stampPdf(pdfBytes, pngBytes, { opacity, scale, position, margin })
 // Usage as CLI: node backend/watermark.js <input.pdf> <logo.png> <output.pdf> [opacity] [position]
 // Needs: npm install pdf-lib (operator runs this where network exists).
-// Defaults picked from the Oct 28 opacity preview test on Meta.png:
+// Defaults picked from the Oct 28 opacity preview test on Tempo-neutral.png:
 // center default: 40% page width, 15% opacity; corners: 18% width + 36pt margin.
 
 const fs = require("node:fs/promises");
@@ -18,7 +18,7 @@ const DEFAULTS = {
   position: "upper-right",
   margin: 36,
   footerBand: 0.12,
-  logoFile: path.resolve(__dirname, "..", "misc", "Meta.png"),
+  logoFile: path.resolve(__dirname, "..", "misc", "Tempo-neutral.png"),
   footerFile: path.resolve(__dirname, "..", "misc", "Footer.jpg")
 };
 

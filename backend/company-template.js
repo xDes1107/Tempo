@@ -1,8 +1,8 @@
-"use strict";
-// Tempo - standardized company-format document render (v2, Meta).
+﻿"use strict";
+// Tempo - standardized company-format document render (v2, Tempo).
 // buildCompanySheet(record, findings, options) -> Promise<Buffer> (A4 PDF).
 //
-// Layout: Meta logo upper-left + company name, product title, hero band
+// Layout: Company logo upper-left + company name, product title, hero band
 // (product image left, key fields right), document control box, ordering
 // block (EAN / quantities, only when found), specifications, website
 // descriptions, quality findings, evidence quotes, footer + disclaimer.
@@ -15,11 +15,11 @@
 // Specifications; empty fields are skipped (sheet is always downloadable).
 //
 // Locked defaults (operator-tunable without code edits):
-// - Company display name: process.env.COMPANY_NAME, default "Meta".
+// - Company display name: process.env.COMPANY_NAME, default "Tempo".
 // - Page: A4 portrait, 48pt margins. Fixed for the demo.
 // - Watermark on the template: opt-in per request (watermarkPngBytes set),
 //   drawn centered at low opacity, same look as the stamp step.
-// - Logo: Meta.png bytes passed in as logoPngBytes (may be null -> skipped).
+// - Logo: Tempo-neutral.png bytes passed in as logoPngBytes (may be null -> skipped).
 // - Product image: JPEG bytes passed in as productImageBytes (extracted
 //   best-effort from the source PDF); placeholder frame when absent.
 // pdf-lib is lazy-required (same pattern as report.js / watermark.js).
@@ -30,7 +30,7 @@ const { LANG_NAMES } = require("./translate");
 const { buildWebsiteDescription } = require("./enrich");
 const { sanitize, wrapText } = require("./pdf-text");
 
-const COMPANY_NAME_DEFAULT = "Meta";
+const COMPANY_NAME_DEFAULT = "Tempo";
 const PAGE_W = 595;
 const PAGE_H = 842;
 const MARGIN = 48;
@@ -245,7 +245,7 @@ async function buildCompanySheet(record, findings, options) {
     y -= 8;
   }
 
-  // Header: Meta logo upper-left, company name beside it, title below.
+  // Header: Company logo upper-left, company name beside it, title below.
   let headX = MARGIN; let logoBottom = null;
   if (logo) {
     const lw = Math.min(LOGO_H * (logo.width / logo.height), 140); const lh = lw * (logo.height / logo.width);
